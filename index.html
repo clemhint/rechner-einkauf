@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aktions-Einkaufskalkulator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg-secondary: #f5f5f3;
+    --bg-tertiary: #eeede9;
+    --bg-info: #e6f1fb;
+    --bg-success: #eaf3de;
+    --bg-warning: #faeeda;
+    --bg-danger: #fcebeb;
+    --text: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-info: #185fa5;
+    --text-success: #3b6d11;
+    --text-warning: #854f0b;
+    --text-danger: #a32d2d;
+    --border: rgba(0,0,0,0.12);
+    --border-md: rgba(0,0,0,0.22);
+    --border-strong: rgba(0,0,0,0.32);
+    --border-info: rgba(24,95,165,0.4);
+    --border-success: rgba(59,109,17,0.4);
+    --border-warning: rgba(133,79,11,0.4);
+    --radius: 8px;
+    --radius-lg: 12px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1c;
+      --bg-secondary: #2a2a28;
+      --bg-tertiary: #333331;
+      --bg-info: #0c3460;
+      --bg-success: #1a3408;
+      --bg-warning: #3d2504;
+      --bg-danger: #3d1010;
+      --text: #f0efe9;
+      --text-secondary: #a8a7a2;
+      --text-info: #85b7eb;
+      --text-success: #97c459;
+      --text-warning: #ef9f27;
+      --text-danger: #f09595;
+      --border: rgba(255,255,255,0.1);
+      --border-md: rgba(255,255,255,0.2);
+      --border-strong: rgba(255,255,255,0.3);
+      --border-info: rgba(133,183,235,0.4);
+      --border-success: rgba(151,196,89,0.4);
+      --border-warning: rgba(239,159,39,0.4);
+    }
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-tertiary);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+  }
+
+  h2 { font-size: 16px; font-weight: 500; margin-bottom: 12px; }
+
+  .card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; }
+
+  @media (max-width: 640px) {
+    .grid3, .grid5 { grid-template-columns: 1fr 1fr; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 13px; color: var(--text-secondary); }
+
+  input[type=number], input[type=text], select {
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 14px;
+    font-family: var(--font);
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    appearance: none;
+  }
+  input:focus, select:focus { outline: 2px solid var(--border-info); outline-offset: 1px; }
+
+  .hint { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .checkbox-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--text-info); }
+  .checkbox-row label { font-size: 14px; cursor: pointer; }
+
+  .divider { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
+
+  /* Staffel */
+  .staffel-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 8px; }
+  @media (max-width: 500px) { .staffel-row { grid-template-columns: 1fr 1fr auto; } }
+
+  /* Buttons */
+  .btn-add {
+    font-size: 13px; font-family: var(--font);
+    color: var(--text-info);
+    background: none;
+    border: 0.5px dashed var(--border-info);
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .btn-add:hover { background: var(--bg-info); }
+
+  .btn-remove {
+    font-size: 12px; font-family: var(--font);
+    color: var(--text-danger);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius);
+    white-space: nowrap;
+  }
+  .btn-remove:hover { background: var(--bg-danger); }
+
+  .btn-calc {
+    font-size: 15px; font-weight: 500; font-family: var(--font);
+    color: var(--text);
+    background: var(--bg-secondary);
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 11px 28px;
+    cursor: pointer;
+    margin-top: 1rem;
+    width: 100%;
+  }
+  .btn-calc:hover { background: var(--bg-tertiary); }
+
+  .toggle-btn {
+    font-size: 12px; font-family: var(--font);
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border-md);
+    background: var(--bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .toggle-btn.active {
+    background: var(--bg-secondary);
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+
+  /* Produkt */
+  .product-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+  .product-name-input {
+    font-size: 15px; font-weight: 500; font-family: var(--font);
+    border: none; padding: 0;
+    background: transparent;
+    color: var(--text);
+    flex: 1; min-width: 0;
+  }
+  .product-name-input:focus { outline: none; border-bottom: 1px solid var(--border-md); }
+
+  /* MHD toggle */
+  .mhd-manual { display: none; margin-top: 6px; }
+  .mhd-manual.visible { display: block; }
+
+  /* Ergebnis */
+  .result-section { margin-top: 2rem; }
+  .result-section h2 { font-size: 18px; margin-bottom: 1rem; }
+
+  .alert {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+  .alert-info { background: var(--bg-info); color: var(--text-info); }
+  .alert-warn { background: var(--bg-warning); color: var(--text-warning); }
+  .alert-success { background: var(--bg-success); color: var(--text-success); }
+  .alert-danger { background: var(--bg-danger); color: var(--text-danger); }
+
+  .result-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    margin-bottom: 10px;
+  }
+  .result-card.best { border-color: var(--border-success); border-width: 1.5px; }
+
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1rem; }
+  .metric { background: var(--bg-secondary); border-radius: var(--radius); padding: 12px 14px; }
+  .metric-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .metric-value { font-size: 20px; font-weight: 500; }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: var(--radius);
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .tag-best { background: var(--bg-success); color: var(--text-success); }
+  .tag-warn { background: var(--bg-warning); color: var(--text-warning); }
+
+  .tbl-header { display: grid; gap: 8px; margin-bottom: 4px; }
+  .tbl-header span { font-size: 11px; color: var(--text-secondary); }
+  .tbl-row { display: grid; gap: 8px; font-size: 13px; padding: 5px 0; border-bottom: 0.5px solid var(--border); }
+  .tbl-row:last-child { border-bottom: none; }
+  .tbl-row.total { border-top: 0.5px solid var(--border-md); margin-top: 4px; font-weight: 500; border-bottom: none; }
+  .r { text-align: right; }
+  .muted { color: var(--text-secondary); }
+  .warn-text { color: var(--text-warning); }
+  .success-text { color: var(--text-success); }
+
+  .footnote { font-size: 11px; color: var(--text-secondary); margin-top: 1.5rem; line-height: 1.6; }
+
+  /* Naturalrabatt info box */
+  .nr-info { font-size: 12px; color: var(--text-secondary); margin-top: 4px; padding: 6px 8px; background: var(--bg-secondary); border-radius: var(--radius); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Aktions-Einkaufskalkulator</h1>
+  <p class="subtitle">Apotheke — Herstelleraktionen mit Rabattstaffeln</p>
+
+  <!-- Aktionsparameter -->
+  <div class="card">
+    <h2>Aktionsparameter</h2>
+    <div class="grid3">
+      <div class="field">
+        <label>Bestellfrist</label>
+        <input type="date" id="g-bestellfrist">
+      </div>
+      <div class="field">
+        <label>Valuta bis</label>
+        <input type="date" id="g-valuta">
+        <span class="hint">optional — ohne Eingabe: 14 Tage ab Bestellfrist</span>
+      </div>
+      <div class="field">
+        <label>Nächste Aktion erwartet</label>
+        <div style="display:flex;gap:8px">
+          <select id="g-monat" style="flex:1.4">
+            <option value="" disabled selected>Monat</option>
+            <option value="1">Jänner</option><option value="2">Februar</option>
+            <option value="3">März</option><option value="4">April</option>
+            <option value="5">Mai</option><option value="6">Juni</option>
+            <option value="7">Juli</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">Oktober</option>
+            <option value="11">November</option><option value="12">Dezember</option>
+          </select>
+          <input type="number" id="g-jahr" placeholder="Jahr" min="2024" max="2040" style="flex:1">
+        </div>
+        <span class="hint">optional — ohne Eingabe: 2 Monate</span>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="grid3">
+      <div class="field">
+        <label>MHD neue Ware</label>
+        <div class="checkbox-row">
+          <input type="checkbox" id="g-mhd-check" checked onchange="toggleMHD()">
+          <label for="g-mhd-check">Mindestens 18 Monate</label>
+        </div>
+        <div class="mhd-manual" id="mhd-manual">
+          <input type="number" id="g-mhd" value="18" min="1" placeholder="Monate">
+        </div>
+      </div>
+      <div class="field">
+        <label>Ziel-Lagerbestand Folgeaktion</label>
+        <div class="checkbox-row">
+          <input type="checkbox" id="g-ziel-ls-check" checked onchange="toggleZielLS()">
+          <label for="g-ziel-ls-check">1 Monat</label>
+        </div>
+        <div class="mhd-manual" id="ziel-ls-manual">
+          <input type="number" id="g-ziel-ls" placeholder="Monate" min="0" step="0.5">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rabattstaffeln -->
+  <div class="card">
+    <h2>Rabattstaffeln</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+      Staffeln gelten produktübergreifend. Pro Staffel wahlweise Bar- oder Naturalrabatt.
+    </p>
+    <div id="staffel-container"></div>
+    <button class="btn-add" onclick="addStaffel()">+ Staffel hinzufügen</button>
+  </div>
+
+  <!-- Produkte -->
+  <div id="produkte-container"></div>
+  <button class="btn-add" onclick="addProdukt()">+ Produkt hinzufügen</button>
+
+  <button class="btn-calc" onclick="berechnen()">Berechnung starten</button>
+
+  <div id="ergebnis"></div>
+
+  <p class="footnote" id="footnote"></p>
+</div>
+
+<script>
+const MHD_PUFFER = 3;
+const KAPITAL_PA = 0.05;
+const LAGER_PA = 0.02;
+const KM = (KAPITAL_PA + LAGER_PA) / 12;
+
+function toggleMHD() {
+  document.getElementById('mhd-manual').classList.toggle('visible', !document.getElementById('g-mhd-check').checked);
+}
+function toggleZielLS() {
+  document.getElementById('ziel-ls-manual').classList.toggle('visible', !document.getElementById('g-ziel-ls-check').checked);
+}
+function getZielLS() {
+  return document.getElementById('g-ziel-ls-check').checked ? 1 : (+document.getElementById('g-ziel-ls').value || 0);
+}
+function getMHD() {
+  return document.getElementById('g-mhd-check').checked ? 18 : (+document.getElementById('g-mhd').value || 18);
+}
+function getNaechste() {
+  const m = +document.getElementById('g-monat').value;
+  const y = +document.getElementById('g-jahr').value;
+  if (!m || !y) return null;
+  return new Date(y, m - 1, 1);
+}
+
+// Naturalrabatt → Barrabatt-Äquivalent
+// kauf X zahl Y → gratis = X-Y → BR = (X-Y)/X
+function naturalZuBar(kaufe, zahle) {
+  if (!kaufe || !zahle || zahle >= kaufe) return 0;
+  return (kaufe - zahle) / kaufe * 100;
+}
+
+function rundeVPE(menge, vpe, minbest) {
+  let m = Math.max(0, menge);
+  if (minbest && m < minbest) m = minbest;
+  if (vpe && vpe > 1) {
+    const r = m % vpe;
+    if (r !== 0) m = m + (vpe - r);
+  }
+  if (minbest && vpe && vpe > 1 && m < minbest) {
+    const r2 = minbest % vpe;
+    m = r2 === 0 ? minbest : minbest + (vpe - r2);
+  }
+  return m;
+}
+
+let staffeln = [];
+
+let produkte = [];
+
+function getEffektiverRabatt(s) {
+  if (s.typ === 'bar') return s.rabatt || 0;
+  return naturalZuBar(s.kaufe, s.zahle);
+}
+
+function renderStaffeln() {
+  const c = document.getElementById('staffel-container');
+  c.innerHTML = '';
+  staffeln.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.style.marginBottom = '12px';
+    div.style.padding = '10px 12px';
+    div.style.background = 'var(--bg-secondary)';
+    div.style.borderRadius = 'var(--radius)';
+
+    const effRabatt = getEffektiverRabatt(s);
+    const infoText = s.typ === 'natural' && s.kaufe && s.zahle
+      ? `Barrabatt-Äquivalent: <strong>${effRabatt.toFixed(2)}%</strong>`
+      : '';
+
+    div.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
+        <div class="field">
+          <label>ab Stück</label>
+          <input type="number" value="${s.menge}" min="1" onchange="staffeln[${i}].menge=+this.value">
+        </div>
+        <div class="field">
+          <label>Rabatttyp</label>
+          <select onchange="staffeln[${i}].typ=this.value;renderStaffeln()">
+            <option value="bar" ${s.typ==='bar'?'selected':''}>Barrabatt (%)</option>
+            <option value="natural" ${s.typ==='natural'?'selected':''}>Naturalrabatt</option>
+          </select>
+        </div>
+        ${s.typ === 'bar' ? `
+        <div class="field">
+          <label>Barrabatt (%)</label>
+          <input type="number" value="${s.rabatt||''}" min="0" max="100" step="0.5" placeholder="z.B. 25" onchange="staffeln[${i}].rabatt=+this.value;renderStaffeln()">
+        </div>
+        ` : `
+        <div class="field">
+          <label>Kauf + NR</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" value="${s.kaufe||''}" min="1" placeholder="Kauf" style="flex:1" onchange="staffeln[${i}].kaufe=+this.value;renderStaffeln()">
+            <span style="font-size:13px;color:var(--text-secondary);white-space:nowrap">+</span>
+            <input type="number" value="${s.zahle!=null?(s.kaufe||0)-(s.zahle||0)||'':''}" min="0" placeholder="NR" style="flex:1" onchange="staffeln[${i}].zahle=(+this.value>=0&&staffeln[${i}].kaufe)?(staffeln[${i}].kaufe-+this.value):null;renderStaffeln()">
+          </div>
+        </div>
+        `}
+        <div style="padding-bottom:2px">
+          <button class="btn-remove" onclick="removeStaffel(${i})">✕</button>
+        </div>
+      </div>
+      ${infoText ? `<div class="nr-info" style="margin-top:8px">${infoText} &nbsp;(kaufe ${s.kaufe}, erhalte ${s.kaufe - s.zahle} gratis)</div>` : ''}
+    `;
+    c.appendChild(div);
+  });
+}
+
+function addStaffel() {
+  staffeln.push({ menge: 0, typ: 'bar', rabatt: 0, kaufe: null, zahle: null });
+  renderStaffeln();
+}
+function removeStaffel(i) { staffeln.splice(i, 1); renderStaffeln(); }
+
+function setAbsatzMode(i, mode) {
+  if (mode === 'jahr') {
+    produkte[i].absatzJahr = produkte[i].absatzMonat != null ? Math.round(produkte[i].absatzMonat * 12) : 0;
+    produkte[i].absatzMonat = null;
+  } else {
+    produkte[i].absatzMonat = produkte[i].absatzJahr != null ? +(produkte[i].absatzJahr / 12).toFixed(2) : 0;
+    produkte[i].absatzJahr = null;
+  }
+  renderProdukte();
+}
+
+function renderEigeneStaffeln(pi) {
+  const p = produkte[pi];
+  const c = document.getElementById(`eigene-staffeln-${pi}`);
+  if (!c) return;
+  c.innerHTML = '';
+  p.eigeneStaffeln.forEach((s, si) => {
+    const effR = getEffektiverRabatt(s);
+    const infoTxt = s.typ === 'natural' && s.kaufe && s.zahle
+      ? `<div class="nr-info" style="margin-top:6px">BR-Äquivalent: <strong>${effR.toFixed(2)}%</strong> &nbsp;(kaufe ${s.kaufe}, erhalte ${s.kaufe - s.zahle} gratis)</div>`
+      : '';
+    const row = document.createElement('div');
+    row.style.cssText = 'margin-bottom:8px;padding:8px 10px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius)';
+    row.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
+        <div class="field"><label>ab Stück</label>
+          <input type="number" value="${s.menge||''}" min="1" onchange="produkte[${pi}].eigeneStaffeln[${si}].menge=+this.value">
+        </div>
+        <div class="field"><label>Rabatttyp</label>
+          <select onchange="produkte[${pi}].eigeneStaffeln[${si}].typ=this.value;renderEigeneStaffeln(${pi})">
+            <option value="bar" ${s.typ==='bar'?'selected':''}>Barrabatt (%)</option>
+            <option value="natural" ${s.typ==='natural'?'selected':''}>Naturalrabatt</option>
+          </select>
+        </div>
+        ${s.typ === 'bar' ? `
+        <div class="field"><label>Barrabatt (%)</label>
+          <input type="number" value="${s.rabatt||''}" min="0" max="100" step="0.5" placeholder="z.B. 25" onchange="produkte[${pi}].eigeneStaffeln[${si}].rabatt=+this.value;renderEigeneStaffeln(${pi})">
+        </div>` : `
+        <div class="field"><label>Kauf + NR</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" value="${s.kaufe||''}" min="1" placeholder="Kauf" style="flex:1" onchange="produkte[${pi}].eigeneStaffeln[${si}].kaufe=+this.value;renderEigeneStaffeln(${pi})">
+            <span style="font-size:13px;color:var(--text-secondary)">+</span>
+            <input type="number" value="${s.kaufe!=null&&s.zahle!=null?(s.kaufe-s.zahle)||'':''}" min="0" placeholder="NR" style="flex:1" onchange="produkte[${pi}].eigeneStaffeln[${si}].zahle=(+this.value>=0&&produkte[${pi}].eigeneStaffeln[${si}].kaufe)?(produkte[${pi}].eigeneStaffeln[${si}].kaufe-+this.value):null;renderEigeneStaffeln(${pi})">
+          </div>
+        </div>`}
+        <div style="padding-bottom:2px">
+          <button class="btn-remove" onclick="produkte[${pi}].eigeneStaffeln.splice(${si},1);renderEigeneStaffeln(${pi})">✕</button>
+        </div>
+      </div>
+      ${infoTxt}
+    `;
+    c.appendChild(row);
+  });
+}
+
+function toggleEigeneKonditionen(pi) {
+  produkte[pi].eigeneKonditionen = !produkte[pi].eigeneKonditionen;
+  renderProdukte();
+}
+
+function renderProdukte() {
+  const c = document.getElementById('produkte-container');
+  c.innerHTML = '';
+  produkte.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="product-header">
+        <input class="product-name-input" type="text" value="${p.name}" placeholder="Produktname" onchange="produkte[${i}].name=this.value">
+        <button class="btn-remove" onclick="removeProdukt(${i})">Produkt entfernen</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;align-items:end">
+        <div class="field">
+          <label>AEP (€)</label>
+          <input type="number" value="${p.aep !== 0 ? p.aep : ''}" min="0" step="0.01" placeholder="0,00" onchange="produkte[${i}].aep=+this.value">
+        </div>
+        <div class="field">
+          <label>Lagerbestand (Stk.)</label>
+          <input type="number" value="${p.ls !== 0 ? p.ls : ''}" min="0" placeholder="0" onchange="produkte[${i}].ls=+this.value">
+        </div>
+        <div class="field">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <label style="margin-bottom:0">Absatz</label>
+            <div style="display:flex;gap:3px">
+              <button class="toggle-btn ${p.absatzJahr !== null ? 'active' : ''}" onclick="setAbsatzMode(${i},'jahr')">Jahr</button>
+              <button class="toggle-btn ${p.absatzMonat !== null ? 'active' : ''}" onclick="setAbsatzMode(${i},'monat')">Monat</button>
+            </div>
+          </div>
+          ${p.absatzJahr !== null
+            ? `<input type="number" value="${p.absatzJahr || ''}" min="0" placeholder="0" onchange="produkte[${i}].absatzJahr=+this.value;produkte[${i}].absatzMonat=null">`
+            : `<input type="number" value="${p.absatzMonat || ''}" min="0" step="0.1" placeholder="0" onchange="produkte[${i}].absatzMonat=+this.value;produkte[${i}].absatzJahr=null">`
+          }
+        </div>
+        <div class="field">
+          <label>Mindestbestellmenge</label>
+          <input type="number" value="${p.minbest || ''}" min="1" placeholder="optional" onchange="produkte[${i}].minbest=this.value?+this.value:null">
+        </div>
+        <div class="field">
+          <label>VPE (Schrittgröße)</label>
+          <input type="number" value="${p.vpe || ''}" min="1" placeholder="optional" onchange="produkte[${i}].vpe=this.value?+this.value:null">
+        </div>
+      </div>
+      <div style="margin-top:12px;padding-top:10px;border-top:0.5px solid var(--border)">
+        <div class="checkbox-row">
+          <input type="checkbox" id="konditionen-${i}" ${!p.eigeneKonditionen ? 'checked' : ''} onchange="toggleEigeneKonditionen(${i})">
+          <label for="konditionen-${i}" style="font-size:13px;color:var(--text-secondary)">Konditionen wie oben (gemeinsame Staffel)</label>
+        </div>
+        ${p.eigeneKonditionen ? `
+        <div style="margin-top:10px;padding:10px 12px;background:var(--bg-secondary);border-radius:var(--radius)">
+          <div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">Eigene Rabattstaffeln für dieses Produkt</div>
+          <div id="eigene-staffeln-${i}"></div>
+          <button class="btn-add" style="margin-top:4px;font-size:12px;padding:4px 12px" onclick="produkte[${i}].eigeneStaffeln.push({menge:0,typ:'bar',rabatt:0,kaufe:null,zahle:null});renderEigeneStaffeln(${i})">+ Staffel hinzufügen</button>
+        </div>` : ''}
+      </div>
+    `;
+    c.appendChild(card);
+    if (p.eigeneKonditionen) renderEigeneStaffeln(i);
+  });
+}
+
+function addProdukt() {
+  produkte.push({ name: 'Neues Produkt', aep: 0, ls: 0, absatzJahr: 0, absatzMonat: null, vpe: null, minbest: null, eigeneKonditionen: false, eigeneStaffeln: [] });
+  renderProdukte();
+}
+function removeProdukt(i) { produkte.splice(i, 1); renderProdukte(); }
+function getMA(p) { return p.absatzMonat !== null ? p.absatzMonat : p.absatzJahr / 12; }
+
+function verteileAufstockung(produktErgebnisse, fehlend) {
+  const gesMA = produktErgebnisse.reduce((s, r) => s + r.ma, 0);
+  let rest = fehlend;
+  return produktErgebnisse.map((r, i) => {
+    if (i === produktErgebnisse.length - 1) return Math.max(0, rest);
+    const anteil = Math.round(fehlend * (r.ma / gesMA));
+    rest -= anteil;
+    return anteil;
+  });
+}
+
+function fmt(n) { return n.toFixed(2).replace('.', ',') + ' €'; }
+function fmtPct(n) { return n.toFixed(2).replace('.', ',') + '%'; }
+
+function berechnen() {
+  const heute = new Date();
+  const mhd = getMHD();
+  const zielLS = getZielLS();
+  const naechste = getNaechste();
+  let monateZurNaechsten, naechsteFallback = false;
+  if (naechste) {
+    monateZurNaechsten = (naechste - heute) / (1000 * 60 * 60 * 24 * 30.44);
+  } else {
+    monateZurNaechsten = 2;
+    naechsteFallback = true;
+  }
+  const mhdFenster = mhd - MHD_PUFFER;
+  const zeitfenster = Math.min(mhdFenster, monateZurNaechsten);
+  const avgLager = zeitfenster / 2;
+
+  // Valuta: optional — fallback 14 Tage ab Bestellfrist
+  const bestellfristVal = document.getElementById('g-bestellfrist').value;
+  const valutaVal = document.getElementById('g-valuta').value;
+  let valutaDatum, valutaLabel, valutaFallback = false;
+  if (valutaVal) {
+    valutaDatum = new Date(valutaVal);
+    valutaLabel = valutaDatum.toLocaleDateString('de-AT', { day:'2-digit', month:'2-digit', year:'numeric' });
+  } else {
+    const bestellfrist = bestellfristVal ? new Date(bestellfristVal) : heute;
+    valutaDatum = new Date(bestellfrist.getTime() + 14 * 24 * 60 * 60 * 1000);
+    valutaLabel = valutaDatum.toLocaleDateString('de-AT', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' (14 Tage ab Bestellfrist)';
+    valutaFallback = true;
+  }
+
+  // Valuta-Verzögerung: Zeit zwischen Bestelldatum und Zahlung
+  // Kapitalbindung beginnt erst ab Valuta, nicht ab Bestellung
+  const bestellDatum = bestellfristVal ? new Date(bestellfristVal) : heute;
+  const valutaVerzögerungMonate = Math.max(0, (valutaDatum - bestellDatum) / (1000 * 60 * 60 * 24 * 30.44));
+  // Effektive Kapitalbindungsdauer = max(0, ø Lagerdauer − Valuta-Verzögerung)
+  const effKapitalDauer = Math.max(0, avgLager - valutaVerzögerungMonate);
+  const valutaEntlastet = valutaVerzögerungMonate > 0;
+
+  const sortedStaffeln = [...staffeln]
+    .map(s => ({ ...s, effRabatt: getEffektiverRabatt(s) }))
+    .sort((a, b) => a.menge - b.menge);
+
+  // Produkte berechnen — nur Produkte mit gemeinsamen Konditionen fließen in Gesamtstaffel
+  const produktErgebnisse = produkte.map(p => {
+    const ma = getMA(p);
+    const zielLSstueck = Math.round(ma * zielLS);
+    const rohmenge = Math.max(0, Math.round(ma * zeitfenster) + zielLSstueck - p.ls);
+    const nettoBedarf = rundeVPE(rohmenge, p.vpe, p.minbest);
+    // Eigene Staffeln sortieren falls vorhanden
+    const eigeneSorted = p.eigeneKonditionen
+      ? [...p.eigeneStaffeln].map(s => ({ ...s, effRabatt: getEffektiverRabatt(s) })).sort((a, b) => a.menge - b.menge)
+      : null;
+    return { p, ma, zielLSstueck, rohmenge, nettoBedarf, gerundet: nettoBedarf > rohmenge, eigeneSorted };
+  });
+
+  // Gesamtstückzahl nur aus Produkten mit gemeinsamer Staffel
+  const gemeinsamErgebnisse = produktErgebnisse.filter(r => !r.p.eigeneKonditionen);
+  const eigeneErgebnisse = produktErgebnisse.filter(r => r.p.eigeneKonditionen);
+  const gesamtNetto = gemeinsamErgebnisse.reduce((s, r) => s + r.nettoBedarf, 0);
+
+  let erreichbareStaffel = null, naechsteStaffel = null;
+  for (let i = 0; i < sortedStaffeln.length; i++) {
+    if (gesamtNetto >= sortedStaffeln[i].menge) erreichbareStaffel = sortedStaffeln[i];
+    else if (!naechsteStaffel) naechsteStaffel = sortedStaffeln[i];
+  }
+
+  function calcVorteil(lst, rabatt) {
+    return lst.reduce((s, { p, menge }) => s + menge * p.aep * (rabatt / 100), 0);
+  }
+  function calcKapital(lst, rabatt) {
+    return lst.reduce((s, { p, menge }) => s + menge * p.aep * (1 - rabatt / 100) * KM * effKapitalDauer, 0);
+  }
+  // Für eigene Konditionen: besten erreichbaren Rabatt pro Produkt ermitteln
+  function getEigenerRabatt(r) {
+    if (!r.eigeneSorted || r.eigeneSorted.length === 0) return 0;
+    let best = 0;
+    for (const s of r.eigeneSorted) {
+      if (r.nettoBedarf >= s.menge) best = s.effRabatt;
+    }
+    return best;
+  }
+
+  const baseList = gemeinsamErgebnisse.map(({ p, nettoBedarf }) => ({ p, menge: nettoBedarf }));
+  const cols4 = '2fr 1fr 1fr 1fr';
+  const cols6 = '2fr 1fr 1fr 1fr 1fr 1fr';
+
+  let html = `<div class="result-section"><h2>Ergebnis</h2>`;
+
+  // Info-Banner
+  const limit = zeitfenster === mhdFenster ? 'MHD' : 'Folgeaktion';
+  html += `<div class="alert alert-info">
+    Zeitfenster: <strong>${zeitfenster.toFixed(1)} Monate</strong> &nbsp;|&nbsp;
+    MHD-Fenster: ${mhdFenster} Monate &nbsp;|&nbsp;
+    Bis Folgeaktion: <strong>${monateZurNaechsten.toFixed(1)} Monate</strong>${naechsteFallback ? ' <em style="font-size:11px">(Standard 2 Mon.)</em>' : ''} &nbsp;|&nbsp;
+    Limitierender Faktor: <strong>${limit}</strong> &nbsp;|&nbsp;
+    Valuta: <strong>${valutaLabel}</strong>${valutaFallback ? ' <em style="font-size:11px">(Standard)</em>' : ''} &nbsp;|&nbsp;
+    Eff. Kapitalbindung: <strong>${effKapitalDauer.toFixed(1)} Monate</strong>${valutaEntlastet ? ` <em style="font-size:11px">(ø ${avgLager.toFixed(1)} Mon. − ${valutaVerzögerungMonate.toFixed(1)} Mon. Valuta)</em>` : ''}
+  </div>`;
+
+  // VPE-Rundungshinweis
+  const gerundete = produktErgebnisse.filter(r => r.gerundet);
+  if (gerundete.length > 0) {
+    const txt = gerundete.map(r => `${r.p.name} (${r.rohmenge} → ${r.nettoBedarf} Stk.)`).join(', ');
+    html += `<div class="alert alert-warn">VPE-Rundung angewendet: ${txt}</div>`;
+  }
+
+  if (!erreichbareStaffel) {
+    html += `<div class="alert alert-danger">Auf Basis des berechneten Bedarfs wird keine Staffelgrenze erreicht. Prüfe die Eingaben.</div>`;
+    html += `</div>`;
+    document.getElementById('ergebnis').innerHTML = html;
+    return;
+  }
+
+  // --- Basisbestellung ---
+  const rabatt = erreichbareStaffel.effRabatt;
+  const brutto = calcVorteil(baseList, rabatt);
+  const kapKosten = calcKapital(baseList, rabatt);
+  const netto = brutto - kapKosten;
+
+  const staffelLabel = erreichbareStaffel.typ === 'natural'
+    ? `ab ${erreichbareStaffel.menge} Stk. — ${erreichbareStaffel.kaufe}+${erreichbareStaffel.kaufe - erreichbareStaffel.zahle} Naturalrabatt (≈ ${fmtPct(rabatt)} BR)`
+    : `ab ${erreichbareStaffel.menge} Stk. — ${fmtPct(rabatt)} Barrabatt`;
+
+  html += `<div class="result-card best">`;
+  html += `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+    <span style="font-size:15px;font-weight:500">Empfohlene Staffel: ${staffelLabel}</span>
+    <span class="tag tag-best">Empfehlung</span>
+  </div>`;
+  html += `<div class="metric-grid">
+    <div class="metric"><div class="metric-label">Gesamtbestellung</div><div class="metric-value">${gesamtNetto} Stk.</div></div>
+    <div class="metric"><div class="metric-label">Bruttovorteil</div><div class="metric-value">${fmt(brutto)}</div></div>
+    <div class="metric"><div class="metric-label">Kapitalbindungskosten</div><div class="metric-value">${fmt(kapKosten)}</div></div>
+    <div class="metric"><div class="metric-label">Nettovorteil</div><div class="metric-value success-text">${fmt(netto)}</div></div>
+  </div>`;
+
+  html += `<div class="tbl-header" style="grid-template-columns:${cols4}">
+    <span>Produkt</span><span class="r">Bestellmenge</span><span class="r">AEP nach Rabatt</span><span class="r">Vorteil</span>
+  </div>`;
+  gemeinsamErgebnisse.forEach(({ p, nettoBedarf, gerundet }) => {
+    const aepNach = (p.aep * (1 - rabatt / 100)).toFixed(2).replace('.', ',');
+    const v = fmt(nettoBedarf * p.aep * (rabatt / 100));
+    const vpeInfo = p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${p.vpe}${gerundet ? ' ↑' : ''})</span>` : '';
+    html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
+      <span>${p.name}${vpeInfo}</span>
+      <span class="r">${nettoBedarf} Stk.</span>
+      <span class="r">${aepNach} €</span>
+      <span class="r">${v}</span>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Produkte mit eigenen Konditionen separat ausgeben
+  if (eigeneErgebnisse.length > 0) {
+    html += `<div class="result-card" style="margin-top:10px">`;
+    html += `<div style="font-size:14px;font-weight:500;margin-bottom:10px">Produkte mit eigenen Konditionen</div>`;
+    html += `<div class="tbl-header" style="grid-template-columns:${cols4}"><span>Produkt</span><span class="r">Bestellmenge</span><span class="r">AEP nach Rabatt</span><span class="r">Vorteil</span></div>`;
+    eigeneErgebnisse.forEach(r => {
+      const eigRabatt = getEigenerRabatt(r);
+      const aepNach = (r.p.aep * (1 - eigRabatt / 100)).toFixed(2).replace('.', ',');
+      const v = fmt(r.nettoBedarf * r.p.aep * (eigRabatt / 100));
+      const vpeInfo = r.p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${r.p.vpe}${r.gerundet ? ' ↑' : ''})</span>` : '';
+      const rabattInfo = eigRabatt > 0 ? ` <span class="muted" style="font-size:11px">(${fmtPct(eigRabatt)})</span>` : ` <span class="muted" style="font-size:11px">(keine Staffel erreicht)</span>`;
+      html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
+        <span>${r.p.name}${vpeInfo}${rabattInfo}</span>
+        <span class="r">${r.nettoBedarf} Stk.</span>
+        <span class="r">${eigRabatt > 0 ? aepNach + ' €' : '—'}</span>
+        <span class="r">${eigRabatt > 0 ? v : '—'}</span>
+      </div>`;
+    });
+    html += `</div>`;
+
+  }
+
+  // --- Aufstockungsblock (nur gemeinsame Staffel) ---
+  if (naechsteStaffel) {
+    const rab2 = naechsteStaffel.effRabatt;
+    const fehlend = naechsteStaffel.menge - gesamtNetto;
+    const rohVerteilung = verteileAufstockung(gemeinsamErgebnisse, fehlend);
+    const aufVerteilung = gemeinsamErgebnisse.map(({ p, nettoBedarf }, i) => {
+      const zielGesamt = nettoBedarf + rohVerteilung[i];
+      return rundeVPE(zielGesamt, p.vpe, null) - nettoBedarf;
+    });
+    const aufList = gemeinsamErgebnisse.map(({ p, nettoBedarf }, i) => ({ p, menge: nettoBedarf + aufVerteilung[i] }));
+    const gesamtMitAuf = aufList.reduce((s, { menge }) => s + menge, 0);
+    const bruttoAuf = calcVorteil(aufList, rab2);
+    const kapAuf = calcKapital(aufList, rab2);
+    const nettoAuf = bruttoAuf - kapAuf;
+    const nettoDiff = nettoAuf - netto;
+    const fehlendNachVPE = naechsteStaffel.menge - gesamtMitAuf;
+
+    const auf2Label = naechsteStaffel.typ === 'natural'
+      ? `auf ${naechsteStaffel.menge} Stk. — ${naechsteStaffel.kaufe}+${naechsteStaffel.kaufe - naechsteStaffel.zahle} Naturalrabatt (≈ ${fmtPct(rab2)} BR)`
+      : `auf ${naechsteStaffel.menge} Stk. — ${fmtPct(rab2)} Barrabatt`;
+
+    html += `<div class="result-card" style="margin-top:10px">`;
+    html += `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <span style="font-size:15px;font-weight:500">Aufstockung ${auf2Label}</span>
+      <span class="tag tag-warn">+${fehlend} Stk. nötig</span>
+    </div>`;
+    html += `<div class="metric-grid">
+      <div class="metric"><div class="metric-label">Gesamtbestellung</div><div class="metric-value">${gesamtMitAuf} Stk.</div></div>
+      <div class="metric"><div class="metric-label">Bruttovorteil</div><div class="metric-value">${fmt(bruttoAuf)}</div></div>
+      <div class="metric"><div class="metric-label">Kapitalbindungskosten</div><div class="metric-value">${fmt(kapAuf)}</div></div>
+      <div class="metric"><div class="metric-label">Nettovorteil</div><div class="metric-value">${fmt(nettoAuf)}</div></div>
+    </div>`;
+
+    html += `<div class="tbl-header" style="grid-template-columns:${cols6}">
+      <span>Produkt</span><span class="r">Basis</span><span class="r">Aufstockung</span><span class="r">Gesamt</span><span class="r">VPE</span><span class="r">Vorteil</span>
+    </div>`;
+    gemeinsamErgebnisse.forEach(({ p, nettoBedarf }, i) => {
+      const auf = aufVerteilung[i];
+      const ges = nettoBedarf + auf;
+      const v = fmt(ges * p.aep * (rab2 / 100));
+      const aufStr = auf > 0
+        ? `<span class="r warn-text">+${auf}</span>`
+        : `<span class="r muted">—</span>`;
+      html += `<div class="tbl-row" style="grid-template-columns:${cols6}">
+        <span>${p.name}</span>
+        <span class="r">${nettoBedarf} Stk.</span>
+        ${aufStr}
+        <span class="r" style="font-weight:500">${ges} Stk.</span>
+        <span class="r muted">${p.vpe || '—'}</span>
+        <span class="r">${v}</span>
+      </div>`;
+    });
+
+    const gesamtAufstockung = gesamtMitAuf - gesamtNetto;
+    html += `<div class="tbl-row total" style="grid-template-columns:${cols6}">
+      <span>Gesamt</span>
+      <span class="r">${gesamtNetto} Stk.</span>
+      <span class="r warn-text">+${gesamtAufstockung}</span>
+      <span class="r">${gesamtMitAuf} Stk.</span>
+      <span class="r">—</span>
+      <span class="r">${fmt(bruttoAuf)}</span>
+    </div>`;
+
+    if (fehlendNachVPE > 0) {
+      html += `<div class="alert alert-warn" style="margin-top:12px;margin-bottom:0">
+        Nach VPE-Rundung: ${gesamtMitAuf} Stk. — Staffelgrenze noch nicht erreicht.
+        Noch <strong>${fehlendNachVPE} Stk.</strong> auf ein beliebiges Produkt aufstocken.
+      </div>`;
+    } else {
+      const cls = nettoDiff > 0 ? 'alert-success' : 'alert-warn';
+      const txt = nettoDiff > 0
+        ? 'Aufstockung ist wirtschaftlich sinnvoll. Prüfe, ob der erhöhte Lagerbestand die Folgeaktion nicht einschränkt.'
+        : 'Aufstockung rechnet sich nicht — Mehrkosten überwiegen den Rabattvorteil.';
+      html += `<div class="alert ${cls}" style="margin-top:12px;margin-bottom:0">
+        Mehrertrag gegenüber Basisbestellung: <strong>${nettoDiff >= 0 ? '+' : ''}${fmt(nettoDiff)}</strong> — ${txt}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  document.getElementById('ergebnis').innerHTML = html;
+  document.getElementById('footnote').innerHTML =
+    `Formel: (Monatsabsatz × Zeitfenster) + Ziel-LS − Lagerbestand, aufgerundet auf VPE &nbsp;|&nbsp;
+     Naturalrabatt: BR = Gratisstücke ÷ Gesamtstücke × 100 &nbsp;|&nbsp;
+     Kapitalbindung: Kostensatz ${((KAPITAL_PA + LAGER_PA) * 100).toFixed(0)}% p.a., eff. Dauer = max(0, ø Lagerdauer − Valuta-Verzögerung) = max(0, ${avgLager.toFixed(1)} − ${valutaVerzögerungMonate.toFixed(1)}) = ${effKapitalDauer.toFixed(1)} Monate &nbsp;|&nbsp;
+     MHD-Puffer ${MHD_PUFFER} Monate.`;
+}
+
+// Init
+renderStaffeln();
+renderProdukte();
+</script>
+</body>
+</html>

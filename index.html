@@ -267,7 +267,13 @@
     <div class="grid3">
       <div class="field">
         <label>Bestellfrist</label>
-        <input type="date" id="g-bestellfrist">
+        <div class="checkbox-row">
+          <input type="checkbox" id="g-bestellfrist-check" checked onchange="toggleBestellfrist()">
+          <label for="g-bestellfrist-check">Monatsletzter</label>
+        </div>
+        <div class="mhd-manual" id="bestellfrist-manual">
+          <input type="date" id="g-bestellfrist" style="margin-top:6px">
+        </div>
       </div>
       <div class="field">
         <label>Valuta bis</label>
@@ -288,7 +294,7 @@
           </select>
           <input type="number" id="g-jahr" placeholder="Jahr" min="2024" max="2040" style="flex:1">
         </div>
-        <span class="hint">optional — ohne Eingabe: 2 Monate</span>
+        <span class="hint">optional — ohne Eingabe: 3 Monate</span>
       </div>
     </div>
     <hr class="divider">
@@ -304,7 +310,7 @@
         </div>
       </div>
       <div class="field">
-        <label>Ziel-Lagerbestand Folgeaktion</label>
+        <label>Ziel-Lagerbestand Folgebestellung</label>
         <div class="checkbox-row">
           <input type="checkbox" id="g-ziel-ls-check" checked onchange="toggleZielLS()">
           <label for="g-ziel-ls-check">1 Monat</label>
@@ -326,11 +332,85 @@
     <button class="btn-add" onclick="addStaffel()">+ Staffel hinzufügen</button>
   </div>
 
+  <!-- Skonto -->
+  <div class="card">
+    <h2>Skonto</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+      Gilt standardmäßig für alle Produkte. Pro Produkt individuell übersteuerbar.
+    </p>
+    <div id="skonto-container"></div>
+    <button class="btn-add" onclick="addSkonto()">+ Skonto hinzufügen</button>
+  </div>
+
   <!-- Produkte -->
   <div id="produkte-container"></div>
-  <button class="btn-add" onclick="addProdukt()">+ Produkt hinzufügen</button>
+  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+    <button class="btn-add" onclick="addProdukt()">+ Produkt hinzufügen</button>
+    <button class="btn-add" onclick="document.getElementById('csv-input').click()" style="color:var(--text-success);border-color:var(--border-success)">+ Produkte aus CSV importieren</button>
+    <input type="file" id="csv-input" accept=".csv,.txt" style="display:none" onchange="csvDateiGeladen(this)">
+  </div>
 
-  <button class="btn-calc" onclick="berechnen()">Berechnung starten</button>
+  <!-- CSV Import Modal -->
+  <div id="csv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;align-items:center;justify-content:center;padding:1rem">
+    <div style="background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border-md);max-width:700px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2 style="margin:0">CSV-Import</h2>
+        <button onclick="csvModalSchliessen()" style="font-size:18px;background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:4px 8px">✕</button>
+      </div>
+
+      <div id="csv-trennzeichen-info" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px"></div>
+
+      <!-- Spaltenzuordnung -->
+      <div style="margin-bottom:1rem">
+        <p style="font-size:13px;font-weight:500;margin-bottom:8px">Spaltenzuordnung</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="field"><label>Artikelname</label>
+            <select id="csv-col-name"></select>
+          </div>
+          <div class="field"><label>AEP (€)</label>
+            <select id="csv-col-aep"></select>
+          </div>
+          <div class="field"><label>Lagerbestand (Stk.)</label>
+            <select id="csv-col-ls"></select>
+          </div>
+          <div class="field"><label>Jahresabsatz (Stk.)</label>
+            <select id="csv-col-absatz"></select>
+          </div>
+          <div class="field"><label>PZN</label>
+            <select id="csv-col-pzn"></select>
+          </div>
+          <div class="field"><label>Packungsgröße</label>
+            <select id="csv-col-packgroesse"></select>
+          </div>
+          <div class="field"><label>Mengeneinheit</label>
+            <select id="csv-col-mengeneinheit"></select>
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="csv-has-header" checked style="width:16px;height:16px;accent-color:var(--text-info)">
+          <label for="csv-has-header" style="font-size:13px;color:var(--text-secondary);cursor:pointer">Erste Zeile ist Kopfzeile</label>
+        </div>
+      </div>
+
+      <!-- Vorschau -->
+      <div style="margin-bottom:1rem">
+        <p style="font-size:13px;font-weight:500;margin-bottom:8px">Vorschau <span id="csv-preview-count" style="font-weight:400;color:var(--text-secondary)"></span></p>
+        <div style="overflow-x:auto;border:0.5px solid var(--border);border-radius:var(--radius)">
+          <table id="csv-preview-table" style="width:100%;border-collapse:collapse;font-size:13px"></table>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="csvModalSchliessen()" style="font-size:14px;font-family:var(--font);padding:8px 18px;border-radius:var(--radius);border:0.5px solid var(--border-md);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer">Abbrechen</button>
+        <button onclick="csvImportieren()" style="font-size:14px;font-weight:500;font-family:var(--font);padding:8px 18px;border-radius:var(--radius);border:0.5px solid var(--border-success);background:var(--bg-success);color:var(--text-success);cursor:pointer">Importieren</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:1rem">
+    <button class="btn-calc" onclick="berechnen()" style="margin-top:0;flex:1">Berechnung starten</button>
+    <button onclick="maskeLeeren()" style="font-size:14px;font-family:var(--font);padding:11px 20px;border-radius:var(--radius);border:0.5px solid var(--border-md);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;white-space:nowrap">Maske leeren</button>
+  </div>
 
   <div id="ergebnis"></div>
 
@@ -343,6 +423,17 @@ const KAPITAL_PA = 0.05;
 const LAGER_PA = 0.02;
 const KM = (KAPITAL_PA + LAGER_PA) / 12;
 
+function toggleBestellfrist() {
+  document.getElementById('bestellfrist-manual').classList.toggle('visible', !document.getElementById('g-bestellfrist-check').checked);
+}
+function getBestellfrist() {
+  if (document.getElementById('g-bestellfrist-check').checked) {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0); // letzter Tag des aktuellen Monats
+  }
+  const val = document.getElementById('g-bestellfrist').value;
+  return val ? new Date(val) : new Date();
+}
 function toggleMHD() {
   document.getElementById('mhd-manual').classList.toggle('visible', !document.getElementById('g-mhd-check').checked);
 }
@@ -384,6 +475,87 @@ function rundeVPE(menge, vpe, minbest) {
 }
 
 let staffeln = [];
+let skontoListe = [];
+
+function renderSkonto() {
+  const c = document.getElementById('skonto-container');
+  c.innerHTML = '';
+  skontoListe.forEach((s, i) => {
+    const fristTyp = s.fristTyp || 'valuta';
+    const infoText = (() => {
+      if (!s.prozent) return '';
+      if (fristTyp === 'valuta') return `Bei Zahlung bis Valuta: <strong>${s.prozent}%</strong> Nachlass — kein früherer Zahlungszeitpunkt, Kapitalbindung wie Valuta.`;
+      if (fristTyp === 'datum' && s.datum) return `Bei Zahlung bis <strong>${new Date(s.datum).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong>: <strong>${s.prozent}%</strong> Nachlass.`;
+      if (fristTyp === 'tage' && s.tage) return `Bei Zahlung binnen <strong>${s.tage} Tagen</strong> ab Bestellfrist: <strong>${s.prozent}%</strong> Nachlass.`;
+      return '';
+    })();
+    const div = document.createElement('div');
+    div.style.cssText = 'margin-bottom:10px;padding:10px 12px;background:var(--bg-secondary);border-radius:var(--radius)';
+    div.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+        <div class="field">
+          <label>Skonto (%)</label>
+          <input type="number" value="${s.prozent||''}" min="0" max="100" step="0.1" placeholder="z.B. 2"
+            onchange="skontoListe[${i}].prozent=+this.value;renderSkonto();markErgebnisVeraltet()">
+        </div>
+        <div class="field">
+          <label>Skonto-Frist</label>
+          <div class="checkbox-row" style="margin-top:2px">
+            <input type="checkbox" id="sk-valuta-${i}" ${fristTyp==='valuta'?'checked':''}
+              onchange="skontoListe[${i}].fristTyp=this.checked?'valuta':'tage';renderSkonto();markErgebnisVeraltet()">
+            <label for="sk-valuta-${i}" style="font-size:13px">= Valuta-Datum</label>
+          </div>
+          ${fristTyp !== 'valuta' ? `
+          <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+            <button class="toggle-btn ${fristTyp==='datum'?'active':''}" style="font-size:12px;padding:3px 8px"
+              onclick="skontoListe[${i}].fristTyp='datum';renderSkonto();markErgebnisVeraltet()">Datum</button>
+            <button class="toggle-btn ${fristTyp==='tage'?'active':''}" style="font-size:12px;padding:3px 8px"
+              onclick="skontoListe[${i}].fristTyp='tage';renderSkonto();markErgebnisVeraltet()">Tage</button>
+          </div>
+          ${fristTyp==='datum'
+            ? `<input type="date" value="${s.datum||''}" style="margin-top:4px"
+                onchange="skontoListe[${i}].datum=this.value;markErgebnisVeraltet()">`
+            : `<input type="number" value="${s.tage||''}" min="1" placeholder="z.B. 10" style="margin-top:4px"
+                onchange="skontoListe[${i}].tage=+this.value;markErgebnisVeraltet()">`
+          }` : ''}
+        </div>
+        <div style="padding-bottom:2px">
+          <button class="btn-remove" onclick="removeSkonto(${i})">✕</button>
+        </div>
+      </div>
+      ${infoText ? `<div class="nr-info" style="margin-top:6px">${infoText}</div>` : ''}
+    `;
+    c.appendChild(div);
+  });
+}
+
+function addSkonto() {
+  skontoListe.push({ prozent: null, fristTyp: 'valuta', datum: null, tage: null });
+  renderSkonto();
+  markErgebnisVeraltet();
+}
+function removeSkonto(i) {
+  skontoListe.splice(i, 1);
+  renderSkonto();
+  markErgebnisVeraltet();
+}
+
+function toggleEigeneSkonto(i) {
+  produkte[i].eigeneSkonto = !produkte[i].eigeneSkonto;
+  renderProdukte();
+  markErgebnisVeraltet();
+}
+
+// Skonto für ein Produkt auflösen: eigenes oder globales
+function getSkontoFuerProdukt(p) {
+  if (p.eigeneSkonto) {
+    return { prozent: p.skonto || 0, fristTyp: p.skontoFristTyp || 'valuta', datum: p.skontoDatum || null, tage: p.skontotage || null };
+  }
+  const global = skontoListe.find(s => s.prozent > 0);
+  return global
+    ? { prozent: global.prozent, fristTyp: global.fristTyp || 'valuta', datum: global.datum || null, tage: global.tage || null }
+    : { prozent: 0, fristTyp: 'valuta', datum: null, tage: null };
+}
 
 let produkte = [];
 
@@ -411,11 +583,11 @@ function renderStaffeln() {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
         <div class="field">
           <label>ab Stück</label>
-          <input type="number" value="${s.menge}" min="1" onchange="staffeln[${i}].menge=+this.value">
+          <input type="number" value="${s.menge}" min="1" onchange="staffeln[${i}].menge=+this.value;markErgebnisVeraltet()">
         </div>
         <div class="field">
           <label>Rabatttyp</label>
-          <select onchange="staffeln[${i}].typ=this.value;renderStaffeln()">
+          <select onchange="staffeln[${i}].typ=this.value;renderStaffeln();markErgebnisVeraltet()">
             <option value="bar" ${s.typ==='bar'?'selected':''}>Barrabatt (%)</option>
             <option value="natural" ${s.typ==='natural'?'selected':''}>Naturalrabatt</option>
           </select>
@@ -423,15 +595,15 @@ function renderStaffeln() {
         ${s.typ === 'bar' ? `
         <div class="field">
           <label>Barrabatt (%)</label>
-          <input type="number" value="${s.rabatt||''}" min="0" max="100" step="0.5" placeholder="z.B. 25" onchange="staffeln[${i}].rabatt=+this.value;renderStaffeln()">
+          <input type="number" value="${s.rabatt||''}" min="0" max="100" step="0.5" placeholder="z.B. 25" onchange="staffeln[${i}].rabatt=+this.value;renderStaffeln();markErgebnisVeraltet()">
         </div>
         ` : `
         <div class="field">
           <label>Kauf + NR</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <input type="number" value="${s.kaufe||''}" min="1" placeholder="Kauf" style="flex:1" onchange="staffeln[${i}].kaufe=+this.value;renderStaffeln()">
+            <input type="number" value="${s.kaufe||''}" min="1" placeholder="Kauf" style="flex:1" onchange="staffeln[${i}].kaufe=+this.value;renderStaffeln();markErgebnisVeraltet()">
             <span style="font-size:13px;color:var(--text-secondary);white-space:nowrap">+</span>
-            <input type="number" value="${s.zahle!=null?(s.kaufe||0)-(s.zahle||0)||'':''}" min="0" placeholder="NR" style="flex:1" onchange="staffeln[${i}].zahle=(+this.value>=0&&staffeln[${i}].kaufe)?(staffeln[${i}].kaufe-+this.value):null;renderStaffeln()">
+            <input type="number" value="${s.zahle!=null?(s.kaufe||0)-(s.zahle||0)||'':''}" min="0" placeholder="NR" style="flex:1" onchange="staffeln[${i}].zahle=(+this.value>=0&&staffeln[${i}].kaufe)?(staffeln[${i}].kaufe-+this.value):null;renderStaffeln();markErgebnisVeraltet()">
           </div>
         </div>
         `}
@@ -448,8 +620,9 @@ function renderStaffeln() {
 function addStaffel() {
   staffeln.push({ menge: 0, typ: 'bar', rabatt: 0, kaufe: null, zahle: null });
   renderStaffeln();
+  markErgebnisVeraltet();
 }
-function removeStaffel(i) { staffeln.splice(i, 1); renderStaffeln(); }
+function removeStaffel(i) { staffeln.splice(i, 1); renderStaffeln(); markErgebnisVeraltet(); }
 
 function setAbsatzMode(i, mode) {
   if (mode === 'jahr') {
@@ -460,6 +633,7 @@ function setAbsatzMode(i, mode) {
     produkte[i].absatzJahr = null;
   }
   renderProdukte();
+  markErgebnisVeraltet();
 }
 
 function renderEigeneStaffeln(pi) {
@@ -509,6 +683,7 @@ function renderEigeneStaffeln(pi) {
 function toggleEigeneKonditionen(pi) {
   produkte[pi].eigeneKonditionen = !produkte[pi].eigeneKonditionen;
   renderProdukte();
+  markErgebnisVeraltet();
 }
 
 function renderProdukte() {
@@ -517,19 +692,24 @@ function renderProdukte() {
   produkte.forEach((p, i) => {
     const card = document.createElement('div');
     card.className = 'card';
+    const metaInfo = [p.pzn, p.packgroesse ? p.packgroesse + (p.mengeneinheit ? ' ' + p.mengeneinheit : '') : null]
+      .filter(Boolean).join(' · ');
     card.innerHTML = `
       <div class="product-header">
-        <input class="product-name-input" type="text" value="${p.name}" placeholder="Produktname" onchange="produkte[${i}].name=this.value">
+        <div style="flex:1;min-width:0">
+          <input class="product-name-input" type="text" value="${p.name}" placeholder="Produktname" onchange="produkte[${i}].name=this.value">
+          ${metaInfo ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${metaInfo}</div>` : ''}
+        </div>
         <button class="btn-remove" onclick="removeProdukt(${i})">Produkt entfernen</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;align-items:end">
         <div class="field">
           <label>AEP (€)</label>
-          <input type="number" value="${p.aep !== 0 ? p.aep : ''}" min="0" step="0.01" placeholder="0,00" onchange="produkte[${i}].aep=+this.value">
+          <input type="number" value="${p.aep !== 0 ? p.aep : ''}" min="0" step="0.01" placeholder="0,00" onchange="produkte[${i}].aep=+this.value;markErgebnisVeraltet()">
         </div>
         <div class="field">
           <label>Lagerbestand (Stk.)</label>
-          <input type="number" value="${p.ls !== 0 ? p.ls : ''}" min="0" placeholder="0" onchange="produkte[${i}].ls=+this.value">
+          <input type="number" value="${p.ls !== 0 ? p.ls : ''}" min="0" placeholder="0" onchange="produkte[${i}].ls=+this.value;markErgebnisVeraltet()">
         </div>
         <div class="field">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -540,18 +720,74 @@ function renderProdukte() {
             </div>
           </div>
           ${p.absatzJahr !== null
-            ? `<input type="number" value="${p.absatzJahr || ''}" min="0" placeholder="0" onchange="produkte[${i}].absatzJahr=+this.value;produkte[${i}].absatzMonat=null">`
-            : `<input type="number" value="${p.absatzMonat || ''}" min="0" step="0.1" placeholder="0" onchange="produkte[${i}].absatzMonat=+this.value;produkte[${i}].absatzJahr=null">`
+            ? `<input type="number" value="${p.absatzJahr || ''}" min="0" placeholder="0" onchange="produkte[${i}].absatzJahr=+this.value;produkte[${i}].absatzMonat=null;markErgebnisVeraltet()">`
+            : `<input type="number" value="${p.absatzMonat || ''}" min="0" step="0.1" placeholder="0" onchange="produkte[${i}].absatzMonat=+this.value;produkte[${i}].absatzJahr=null;markErgebnisVeraltet()">`
           }
         </div>
         <div class="field">
           <label>Mindestbestellmenge</label>
-          <input type="number" value="${p.minbest || ''}" min="1" placeholder="optional" onchange="produkte[${i}].minbest=this.value?+this.value:null">
+          <input type="number" value="${p.minbest || ''}" min="1" placeholder="optional" onchange="produkte[${i}].minbest=this.value?+this.value:null;markErgebnisVeraltet()">
         </div>
         <div class="field">
           <label>VPE (Schrittgröße)</label>
-          <input type="number" value="${p.vpe || ''}" min="1" placeholder="optional" onchange="produkte[${i}].vpe=this.value?+this.value:null">
+          <input type="number" value="${p.vpe || ''}" min="1" placeholder="optional" onchange="produkte[${i}].vpe=this.value?+this.value:null;markErgebnisVeraltet()">
         </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end;margin-top:8px">
+        <div class="field">
+          <label style="font-size:11px">PZN</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" value="${p.pzn || ''}" placeholder="optional" style="font-size:12px" onchange="produkte[${i}].pzn=this.value.replace(/[^0-9]/g,'')||null;this.value=produkte[${i}].pzn||''">
+        </div>
+        <div class="field">
+          <label style="font-size:11px">Packungsgröße</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" value="${p.packgroesse || ''}" placeholder="optional" style="font-size:12px" onchange="produkte[${i}].packgroesse=this.value.replace(/[^0-9]/g,'')||null;this.value=produkte[${i}].packgroesse||''">
+        </div>
+        <div class="field">
+          <label style="font-size:11px">Mengeneinheit</label>
+          <select style="font-size:12px" onchange="produkte[${i}].mengeneinheit=this.value||null;markErgebnisVeraltet()">
+            <option value="">—</option>
+            <option value="Stk" ${p.mengeneinheit==='Stk'?'selected':''}>Stk</option>
+            <option value="ml" ${p.mengeneinheit==='ml'?'selected':''}>ml</option>
+            <option value="g" ${p.mengeneinheit==='g'?'selected':''}>g</option>
+            <option value="Pkg" ${p.mengeneinheit==='Pkg'?'selected':''}>Pkg</option>
+            <option value="andere" ${p.mengeneinheit&&!['Stk','ml','g','Pkg'].includes(p.mengeneinheit)?'selected':''}>andere</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding-top:8px;border-top:0.5px solid var(--border)">
+        <div class="checkbox-row">
+          <input type="checkbox" id="skonto-check-${i}" ${!p.eigeneSkonto ? 'checked' : ''} onchange="toggleEigeneSkonto(${i})">
+          <label for="skonto-check-${i}" style="font-size:13px;color:var(--text-secondary)">Skonto wie oben</label>
+        </div>
+        ${p.eigeneSkonto ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div class="field">
+            <label>Skonto (%)</label>
+            <input type="number" value="${p.skonto || ''}" min="0" max="100" step="0.1" placeholder="z.B. 2"
+              onchange="produkte[${i}].skonto=this.value?+this.value:null;markErgebnisVeraltet()">
+          </div>
+          <div class="field">
+            <label>Skonto-Frist</label>
+            <div class="checkbox-row" style="margin-top:2px">
+              <input type="checkbox" id="p-sk-valuta-${i}" ${(!p.skontoFristTyp||p.skontoFristTyp==='valuta')?'checked':''}
+                onchange="produkte[${i}].skontoFristTyp=this.checked?'valuta':'tage';renderProdukte();markErgebnisVeraltet()">
+              <label for="p-sk-valuta-${i}" style="font-size:13px">= Valuta-Datum</label>
+            </div>
+            ${(p.skontoFristTyp && p.skontoFristTyp !== 'valuta') ? `
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button class="toggle-btn ${p.skontoFristTyp==='datum'?'active':''}" style="font-size:12px;padding:3px 8px"
+                onclick="produkte[${i}].skontoFristTyp='datum';renderProdukte();markErgebnisVeraltet()">Datum</button>
+              <button class="toggle-btn ${p.skontoFristTyp==='tage'?'active':''}" style="font-size:12px;padding:3px 8px"
+                onclick="produkte[${i}].skontoFristTyp='tage';renderProdukte();markErgebnisVeraltet()">Tage</button>
+            </div>
+            ${p.skontoFristTyp==='datum'
+              ? `<input type="date" value="${p.skontoDatum||''}" style="margin-top:4px"
+                  onchange="produkte[${i}].skontoDatum=this.value;markErgebnisVeraltet()">`
+              : `<input type="number" value="${p.skontotage||''}" min="1" placeholder="z.B. 10" style="margin-top:4px"
+                  onchange="produkte[${i}].skontotage=+this.value;markErgebnisVeraltet()">`
+            }` : ''}
+          </div>
+        </div>` : ''}
       </div>
       <div style="margin-top:12px;padding-top:10px;border-top:0.5px solid var(--border)">
         <div class="checkbox-row">
@@ -572,10 +808,11 @@ function renderProdukte() {
 }
 
 function addProdukt() {
-  produkte.push({ name: 'Neues Produkt', aep: 0, ls: 0, absatzJahr: 0, absatzMonat: null, vpe: null, minbest: null, eigeneKonditionen: false, eigeneStaffeln: [] });
+  produkte.push({ name: 'Neues Produkt', aep: 0, ls: 0, absatzJahr: 0, absatzMonat: null, vpe: null, minbest: null, eigeneKonditionen: false, eigeneStaffeln: [], skonto: null, skontotage: null, eigeneSkonto: false, pzn: null, packgroesse: null, mengeneinheit: null });
   renderProdukte();
+  markErgebnisVeraltet();
 }
-function removeProdukt(i) { produkte.splice(i, 1); renderProdukte(); }
+function removeProdukt(i) { produkte.splice(i, 1); renderProdukte(); markErgebnisVeraltet(); }
 function getMA(p) { return p.absatzMonat !== null ? p.absatzMonat : p.absatzJahr / 12; }
 
 function verteileAufstockung(produktErgebnisse, fehlend) {
@@ -589,10 +826,23 @@ function verteileAufstockung(produktErgebnisse, fehlend) {
   });
 }
 
+function markErgebnisVeraltet() {
+  const el = document.getElementById('ergebnis');
+  if (el.innerHTML.trim() === '') return;
+  if (document.getElementById('ergebnis-veraltet')) return;
+  const banner = document.createElement('div');
+  banner.id = 'ergebnis-veraltet';
+  banner.className = 'alert alert-warn';
+  banner.style.cssText = 'margin-bottom:0;margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:12px';
+  banner.innerHTML = `<span>Eingaben wurden geändert — Ergebnis ist nicht mehr aktuell.</span><button onclick="berechnen()" style="font-size:13px;font-family:var(--font);padding:5px 14px;border-radius:var(--radius);border:0.5px solid var(--border-warning);background:transparent;color:var(--text-warning);cursor:pointer;white-space:nowrap">Neu berechnen</button>`;
+  el.prepend(banner);
+}
 function fmt(n) { return n.toFixed(2).replace('.', ',') + ' €'; }
 function fmtPct(n) { return n.toFixed(2).replace('.', ',') + '%'; }
 
 function berechnen() {
+  const veraltet = document.getElementById('ergebnis-veraltet');
+  if (veraltet) veraltet.remove();
   const heute = new Date();
   const mhd = getMHD();
   const zielLS = getZielLS();
@@ -601,7 +851,7 @@ function berechnen() {
   if (naechste) {
     monateZurNaechsten = (naechste - heute) / (1000 * 60 * 60 * 24 * 30.44);
   } else {
-    monateZurNaechsten = 2;
+    monateZurNaechsten = 3;
     naechsteFallback = true;
   }
   const mhdFenster = mhd - MHD_PUFFER;
@@ -609,22 +859,20 @@ function berechnen() {
   const avgLager = zeitfenster / 2;
 
   // Valuta: optional — fallback 14 Tage ab Bestellfrist
-  const bestellfristVal = document.getElementById('g-bestellfrist').value;
+  const bestellDatum = getBestellfrist();
+  const bestellfristLabel = document.getElementById('g-bestellfrist-check').checked
+    ? `${bestellDatum.toLocaleDateString('de-AT', { day:'2-digit', month:'2-digit', year:'numeric' })} (Monatsletzter)`
+    : bestellDatum.toLocaleDateString('de-AT', { day:'2-digit', month:'2-digit', year:'numeric' });
   const valutaVal = document.getElementById('g-valuta').value;
   let valutaDatum, valutaLabel, valutaFallback = false;
   if (valutaVal) {
     valutaDatum = new Date(valutaVal);
     valutaLabel = valutaDatum.toLocaleDateString('de-AT', { day:'2-digit', month:'2-digit', year:'numeric' });
   } else {
-    const bestellfrist = bestellfristVal ? new Date(bestellfristVal) : heute;
-    valutaDatum = new Date(bestellfrist.getTime() + 14 * 24 * 60 * 60 * 1000);
+    valutaDatum = new Date(bestellDatum.getTime() + 14 * 24 * 60 * 60 * 1000);
     valutaLabel = valutaDatum.toLocaleDateString('de-AT', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' (14 Tage ab Bestellfrist)';
     valutaFallback = true;
   }
-
-  // Valuta-Verzögerung: Zeit zwischen Bestelldatum und Zahlung
-  // Kapitalbindung beginnt erst ab Valuta, nicht ab Bestellung
-  const bestellDatum = bestellfristVal ? new Date(bestellfristVal) : heute;
   const valutaVerzögerungMonate = Math.max(0, (valutaDatum - bestellDatum) / (1000 * 60 * 60 * 24 * 30.44));
   // Effektive Kapitalbindungsdauer = max(0, ø Lagerdauer − Valuta-Verzögerung)
   const effKapitalDauer = Math.max(0, avgLager - valutaVerzögerungMonate);
@@ -658,11 +906,41 @@ function berechnen() {
     else if (!naechsteStaffel) naechsteStaffel = sortedStaffeln[i];
   }
 
+  // Skonto: effektiver Netto-AEP pro Produkt = AEP × (1 - Rabatt%) × (1 - Skonto%)
+  function getSkonto(p) { return getSkontoFuerProdukt(p).prozent || 0; }
+
+  // Effektive Kapitalkosten-Dauer pro Produkt
+  function effKapitalDauerP(p) {
+    const sk = getSkontoFuerProdukt(p);
+    if (!sk.prozent) return effKapitalDauer; // kein Skonto → Valuta-Logik
+    if (sk.fristTyp === 'valuta') return effKapitalDauer; // Skonto-Frist = Valuta → keine Änderung
+    let zahlungsDatum;
+    if (sk.fristTyp === 'datum' && sk.datum) {
+      zahlungsDatum = new Date(sk.datum);
+    } else if (sk.fristTyp === 'tage' && sk.tage) {
+      zahlungsDatum = new Date(bestellDatum.getTime() + sk.tage * 24 * 60 * 60 * 1000);
+    } else {
+      return effKapitalDauer;
+    }
+    const skontoVerzMonate = Math.max(0, (zahlungsDatum - bestellDatum) / (1000 * 60 * 60 * 24 * 30.44));
+    return Math.max(0, avgLager - skontoVerzMonate);
+  }
+
   function calcVorteil(lst, rabatt) {
-    return lst.reduce((s, { p, menge }) => s + menge * p.aep * (rabatt / 100), 0);
+    // Vorteil = Differenz zwischen normalem AEP und AEP nach Rabatt+Skonto
+    return lst.reduce((s, { p, menge }) => {
+      const sk = getSkonto(p);
+      const normalAep = p.aep;
+      const aktionsAep = normalAep * (1 - rabatt / 100) * (1 - sk / 100);
+      return s + menge * (normalAep - aktionsAep);
+    }, 0);
   }
   function calcKapital(lst, rabatt) {
-    return lst.reduce((s, { p, menge }) => s + menge * p.aep * (1 - rabatt / 100) * KM * effKapitalDauer, 0);
+    return lst.reduce((s, { p, menge }) => {
+      const sk = getSkonto(p);
+      const aktionsAep = p.aep * (1 - rabatt / 100) * (1 - sk / 100);
+      return s + menge * aktionsAep * KM * effKapitalDauerP(p);
+    }, 0);
   }
   // Für eigene Konditionen: besten erreichbaren Rabatt pro Produkt ermitteln
   function getEigenerRabatt(r) {
@@ -683,9 +961,10 @@ function berechnen() {
   // Info-Banner
   const limit = zeitfenster === mhdFenster ? 'MHD' : 'Folgeaktion';
   html += `<div class="alert alert-info">
+    Bestellfrist: <strong>${bestellfristLabel}</strong> &nbsp;|&nbsp;
     Zeitfenster: <strong>${zeitfenster.toFixed(1)} Monate</strong> &nbsp;|&nbsp;
     MHD-Fenster: ${mhdFenster} Monate &nbsp;|&nbsp;
-    Bis Folgeaktion: <strong>${monateZurNaechsten.toFixed(1)} Monate</strong>${naechsteFallback ? ' <em style="font-size:11px">(Standard 2 Mon.)</em>' : ''} &nbsp;|&nbsp;
+    Bis Folgeaktion: <strong>${monateZurNaechsten.toFixed(1)} Monate</strong>${naechsteFallback ? ' <em style="font-size:11px">(Standard 3 Mon.)</em>' : ''} &nbsp;|&nbsp;
     Limitierender Faktor: <strong>${limit}</strong> &nbsp;|&nbsp;
     Valuta: <strong>${valutaLabel}</strong>${valutaFallback ? ' <em style="font-size:11px">(Standard)</em>' : ''} &nbsp;|&nbsp;
     Eff. Kapitalbindung: <strong>${effKapitalDauer.toFixed(1)} Monate</strong>${valutaEntlastet ? ` <em style="font-size:11px">(ø ${avgLager.toFixed(1)} Mon. − ${valutaVerzögerungMonate.toFixed(1)} Mon. Valuta)</em>` : ''}
@@ -728,17 +1007,19 @@ function berechnen() {
   </div>`;
 
   html += `<div class="tbl-header" style="grid-template-columns:${cols4}">
-    <span>Produkt</span><span class="r">Bestellmenge</span><span class="r">AEP nach Rabatt</span><span class="r">Vorteil</span>
+    <span>Produkt</span><span class="r">Bestellmenge</span><span class="r">Netto-AEP</span><span class="r">Gesamtvorteil</span>
   </div>`;
   gemeinsamErgebnisse.forEach(({ p, nettoBedarf, gerundet }) => {
-    const aepNach = (p.aep * (1 - rabatt / 100)).toFixed(2).replace('.', ',');
-    const v = fmt(nettoBedarf * p.aep * (rabatt / 100));
+    const sk = getSkonto(p);
+    const aktionsAep = p.aep * (1 - rabatt / 100) * (1 - sk / 100);
+    const vorteil = nettoBedarf * (p.aep - aktionsAep);
+    const skontoInfo = sk > 0 ? ` <span class="muted" style="font-size:11px">(inkl. ${sk}% Sk.)</span>` : '';
     const vpeInfo = p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${p.vpe}${gerundet ? ' ↑' : ''})</span>` : '';
     html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
       <span>${p.name}${vpeInfo}</span>
       <span class="r">${nettoBedarf} Stk.</span>
-      <span class="r">${aepNach} €</span>
-      <span class="r">${v}</span>
+      <span class="r">${aktionsAep.toFixed(2).replace('.', ',')} €${skontoInfo}</span>
+      <span class="r">${fmt(vorteil)}</span>
     </div>`;
   });
   html += `</div>`;
@@ -747,18 +1028,19 @@ function berechnen() {
   if (eigeneErgebnisse.length > 0) {
     html += `<div class="result-card" style="margin-top:10px">`;
     html += `<div style="font-size:14px;font-weight:500;margin-bottom:10px">Produkte mit eigenen Konditionen</div>`;
-    html += `<div class="tbl-header" style="grid-template-columns:${cols4}"><span>Produkt</span><span class="r">Bestellmenge</span><span class="r">AEP nach Rabatt</span><span class="r">Vorteil</span></div>`;
+    html += `<div class="tbl-header" style="grid-template-columns:${cols4}"><span>Produkt</span><span class="r">Bestellmenge</span><span class="r">Netto-AEP</span><span class="r">Gesamtvorteil</span></div>`;
     eigeneErgebnisse.forEach(r => {
       const eigRabatt = getEigenerRabatt(r);
-      const aepNach = (r.p.aep * (1 - eigRabatt / 100)).toFixed(2).replace('.', ',');
-      const v = fmt(r.nettoBedarf * r.p.aep * (eigRabatt / 100));
+      const sk = getSkonto(r.p);
+      const aktionsAep = r.p.aep * (1 - eigRabatt / 100) * (1 - sk / 100);
+      const vorteil = r.nettoBedarf * (r.p.aep - aktionsAep);
       const vpeInfo = r.p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${r.p.vpe}${r.gerundet ? ' ↑' : ''})</span>` : '';
-      const rabattInfo = eigRabatt > 0 ? ` <span class="muted" style="font-size:11px">(${fmtPct(eigRabatt)})</span>` : ` <span class="muted" style="font-size:11px">(keine Staffel erreicht)</span>`;
+      const rabattInfo = eigRabatt > 0 ? ` <span class="muted" style="font-size:11px">(${fmtPct(eigRabatt)}${sk > 0 ? ` + ${sk}% Sk.` : ''})</span>` : ` <span class="muted" style="font-size:11px">(keine Staffel erreicht)</span>`;
       html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
         <span>${r.p.name}${vpeInfo}${rabattInfo}</span>
         <span class="r">${r.nettoBedarf} Stk.</span>
-        <span class="r">${eigRabatt > 0 ? aepNach + ' €' : '—'}</span>
-        <span class="r">${eigRabatt > 0 ? v : '—'}</span>
+        <span class="r">${eigRabatt > 0 ? aktionsAep.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+        <span class="r">${eigRabatt > 0 ? fmt(vorteil) : '—'}</span>
       </div>`;
     });
     html += `</div>`;
@@ -799,12 +1081,14 @@ function berechnen() {
     </div>`;
 
     html += `<div class="tbl-header" style="grid-template-columns:${cols6}">
-      <span>Produkt</span><span class="r">Basis</span><span class="r">Aufstockung</span><span class="r">Gesamt</span><span class="r">VPE</span><span class="r">Vorteil</span>
+      <span>Produkt</span><span class="r">Basis</span><span class="r">Aufstockung</span><span class="r">Gesamt</span><span class="r">VPE</span><span class="r">Gesamtvorteil</span>
     </div>`;
     gemeinsamErgebnisse.forEach(({ p, nettoBedarf }, i) => {
       const auf = aufVerteilung[i];
       const ges = nettoBedarf + auf;
-      const v = fmt(ges * p.aep * (rab2 / 100));
+      const sk = getSkonto(p);
+      const aktionsAep = p.aep * (1 - rab2 / 100) * (1 - sk / 100);
+      const vorteil = ges * (p.aep - aktionsAep);
       const aufStr = auf > 0
         ? `<span class="r warn-text">+${auf}</span>`
         : `<span class="r muted">—</span>`;
@@ -814,7 +1098,7 @@ function berechnen() {
         ${aufStr}
         <span class="r" style="font-weight:500">${ges} Stk.</span>
         <span class="r muted">${p.vpe || '—'}</span>
-        <span class="r">${v}</span>
+        <span class="r">${fmt(vorteil)}</span>
       </div>`;
     });
 
@@ -846,16 +1130,354 @@ function berechnen() {
   }
 
   html += `</div>`;
+  html += `<div style="margin-top:1rem;display:flex;justify-content:flex-end">
+    <button onclick="drucken()" style="font-size:13px;font-family:var(--font);padding:7px 18px;border-radius:var(--radius);border:0.5px solid var(--border-md);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:6px">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M4 4V1h8v3M4 11H2a1 1 0 01-1-1V6a1 1 0 011-1h12a1 1 0 011 1v4a1 1 0 01-1 1h-2M4 8h8M4 11v4h8v-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Drucken
+    </button>
+  </div>`;
   document.getElementById('ergebnis').innerHTML = html;
   document.getElementById('footnote').innerHTML =
     `Formel: (Monatsabsatz × Zeitfenster) + Ziel-LS − Lagerbestand, aufgerundet auf VPE &nbsp;|&nbsp;
      Naturalrabatt: BR = Gratisstücke ÷ Gesamtstücke × 100 &nbsp;|&nbsp;
      Kapitalbindung: Kostensatz ${((KAPITAL_PA + LAGER_PA) * 100).toFixed(0)}% p.a., eff. Dauer = max(0, ø Lagerdauer − Valuta-Verzögerung) = max(0, ${avgLager.toFixed(1)} − ${valutaVerzögerungMonate.toFixed(1)}) = ${effKapitalDauer.toFixed(1)} Monate &nbsp;|&nbsp;
      MHD-Puffer ${MHD_PUFFER} Monate.`;
+
+  // Druckdaten für drucken() speichern
+  window._druckDaten = {
+    staffeln: sortedStaffeln,
+    skontoListe: skontoListe,
+    ergebnisHTML: document.getElementById('ergebnis').innerHTML,
+    bestellfristLabel, valutaLabel, zeitfenster, monateZurNaechsten, limit,
+    effKapitalDauer, avgLager, valutaVerzögerungMonate
+  };
+}
+
+// ── Drucken ─────────────────────────────────────────────────
+function drucken() {
+  const d = window._druckDaten;
+  if (!d) return;
+
+  const staffelRows = d.staffeln.map(s => {
+    const r = s.effRabatt.toFixed(2).replace('.', ',');
+    const typ = s.typ === 'natural'
+      ? `Naturalrabatt ${s.kaufe}+${s.kaufe-s.zahle} (≈${r}% BR)`
+      : `${r}% Barrabatt`;
+    return `<tr><td>ab ${s.menge} Stk.</td><td>${typ}</td></tr>`;
+  }).join('');
+
+  const skontoRows = (d.skontoListe || []).filter(s => s.prozent > 0).map(s => {
+    const frist = s.fristTyp === 'valuta'
+      ? '= Valuta-Datum'
+      : s.fristTyp === 'datum' && s.datum
+        ? `bis ${new Date(s.datum).toLocaleDateString('de-AT', {day:'2-digit',month:'2-digit',year:'numeric'})}`
+        : s.fristTyp === 'tage' && s.tage
+          ? `binnen ${s.tage} Tagen ab Bestellfrist`
+          : '—';
+    return `<tr><td>${s.prozent.toFixed(2).replace('.', ',')}%</td><td>${frist}</td></tr>`;
+  }).join('');
+
+  const skontoSection = skontoRows
+    ? `<div class="section">
+        <h2>Skonto</h2>
+        <table>
+          <thead><tr><th>Skonto</th><th>Frist</th></tr></thead>
+          <tbody>${skontoRows}</tbody>
+        </table>
+      </div>`
+    : '';
+
+  // Ergebnis-Cards aus dem DOM extrahieren (ohne Print-Button und Veraltet-Banner)
+  const ergebnisEl = document.getElementById('ergebnis');
+  const cards = Array.from(ergebnisEl.querySelectorAll('.result-card'));
+  const infoAlert = ergebnisEl.querySelector('.alert-info');
+  const infoHTML = infoAlert ? infoAlert.outerHTML : '';
+  const cardsHTML = cards.map(c => c.outerHTML).join('');
+
+  const win = window.open('', '_blank', 'width=800,height=900');
+  win.document.write(`<!DOCTYPE html><html lang="de"><head>
+<meta charset="UTF-8">
+<title>Aktions-Einkaufskalkulator — Ergebnis</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1a1a18;padding:2rem;max-width:800px;margin:0 auto}
+  h1{font-size:18px;font-weight:500;margin-bottom:0.25rem}
+  h2{font-size:15px;font-weight:500;margin-bottom:10px}
+  .subtitle{font-size:11px;color:#5f5e5a;margin-bottom:1.5rem}
+  .section{margin-bottom:1.5rem}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{font-size:11px;color:#5f5e5a;font-weight:500;text-align:left;padding:4px 8px;border-bottom:1px solid #ddd}
+  td{padding:4px 8px;border-bottom:0.5px solid #eee}
+  .card{border:1px solid #ddd;border-radius:8px;padding:1rem;margin-bottom:10px}
+  .card.best{border-color:#3b6d11;border-width:1.5px}
+  .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  .metric{background:#f5f5f3;border-radius:6px;padding:8px 10px}
+  .metric-label{font-size:10px;color:#5f5e5a;margin-bottom:2px}
+  .metric-value{font-size:16px;font-weight:500}
+  .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;background:#eaf3de;color:#3b6d11}
+  .tag-warn{background:#faeeda;color:#854f0b}
+  .tbl-header{display:grid;gap:8px;margin-bottom:3px}
+  .tbl-header span,.prod-result-header{font-size:10px;color:#5f5e5a}
+  .tbl-row{display:grid;gap:8px;font-size:12px;padding:4px 0;border-bottom:0.5px solid #eee}
+  .tbl-row.total{border-top:1px solid #ccc;margin-top:3px;font-weight:500;border-bottom:none}
+  .r{text-align:right}
+  .muted{color:#5f5e5a}
+  .warn-text{color:#854f0b}
+  .success-text{color:#3b6d11}
+  .alert{padding:8px 12px;border-radius:6px;font-size:11px;margin-bottom:10px;line-height:1.5}
+  .alert-info{background:#e6f1fb;color:#185fa5}
+  .alert-warn{background:#faeeda;color:#854f0b}
+  .alert-success{background:#eaf3de;color:#3b6d11}
+  .alert-danger{background:#fcebeb;color:#a32d2d}
+  .no-print{display:none}
+  @media print{body{padding:1rem}.no-print{display:none}}
+</style>
+</head><body>
+<h1>Aktions-Einkaufskalkulator</h1>
+<p class="subtitle">Erstellt am ${new Date().toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'})}</p>
+
+<div class="section">
+  <h2>Rabattstaffeln</h2>
+  <table>
+    <thead><tr><th>Staffel</th><th>Kondition</th></tr></thead>
+    <tbody>${staffelRows}</tbody>
+  </table>
+</div>
+
+${skontoSection}
+
+<div class="section">
+  <h2>Ergebnis</h2>
+  ${infoHTML}
+  ${cardsHTML}
+</div>
+
+<script>window.onload=()=>window.print();<\/script>
+</body></html>`);
+  win.document.close();
+}
+// ── Ende Drucken ─────────────────────────────────────────────
+
+// ── CSV Import ──────────────────────────────────────────────
+let csvParsed = { headers: [], rows: [] };
+
+function csvTrennzeichenErkennen(text) {
+  const counts = { ';': 0, ',': 0, '\t': 0 };
+  const first = text.split('\n').slice(0, 5).join('\n');
+  for (const c of Object.keys(counts)) counts[c] = (first.match(new RegExp('\\' + (c === '\t' ? 't' : c), 'g')) || []).length;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function csvZeileParsen(line, sep) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === sep && !inQ) { result.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function csvDateiGeladen(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const sep = csvTrennzeichenErkennen(text);
+    const sepName = sep === ';' ? 'Semikolon' : sep === ',' ? 'Komma' : 'Tabulator';
+    document.getElementById('csv-trennzeichen-info').textContent = `Erkanntes Trennzeichen: ${sepName}`;
+
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    const hasHeader = document.getElementById('csv-has-header').checked;
+    const allRows = lines.map(l => csvZeileParsen(l, sep));
+    const headers = hasHeader ? allRows[0] : allRows[0].map((_, i) => `Spalte ${i + 1}`);
+    const rows = hasHeader ? allRows.slice(1) : allRows;
+
+    csvParsed = { headers, rows, sep };
+    csvSpaltenAktualisieren(headers);
+    csvVorschauAktualisieren();
+    document.getElementById('csv-modal').style.display = 'flex';
+  };
+  reader.readAsText(file, 'windows-1252');
+}
+
+function csvSpaltenAktualisieren(headers) {
+  const ids =    ['csv-col-name', 'csv-col-aep', 'csv-col-ls',    'csv-col-absatz', 'csv-col-pzn', 'csv-col-packgroesse', 'csv-col-mengeneinheit'];
+  const hints = [
+    ['bezeichnung', 'artikel', 'name', 'produkt', 'description'],
+    ['aep', 'preis', 'price', 'einkauf', 'ek'],
+    ['lstd', 'lager', 'bestand', 'stock', 'ls'],
+    ['v \u02dc1j', 'v˜1j', 'v ~1j', 'v~1j', '\u02dc1j', '˜1j', 'absatz', 'verkauf', 'umsatz', 'sales', 'qty'],
+    ['phznr', 'pzn', 'pharma'],
+    ['packungsgr', 'packg', 'menge', 'size', 'gr\xf6\xdfe'],
+    ['mengeneinheit', 'einheit', 'unit', 'me']
+  ];
+
+  ids.forEach((id, i) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="-1">— nicht importieren —</option>' +
+      headers.map((h, j) => `<option value="${j}">${h}</option>`).join('');
+    const lower = headers.map(h => h.toLowerCase());
+    const match = hints[i].map(hint => lower.findIndex(h => h.includes(hint))).find(x => x >= 0);
+    sel.value = match !== undefined ? match : -1;
+    sel.onchange = csvVorschauAktualisieren;
+  });
+
+  document.getElementById('csv-has-header').onchange = () => {
+    const hasHeader = document.getElementById('csv-has-header').checked;
+    // Re-parse with updated header setting
+    const allRows = [...csvParsed.rows];
+    if (!hasHeader) {
+      // Put header back as first row
+      csvParsed.rows = [csvParsed.headers, ...allRows];
+      csvParsed.headers = csvParsed.headers.map((_, i) => `Spalte ${i + 1}`);
+    } else {
+      csvParsed.headers = csvParsed.rows[0];
+      csvParsed.rows = csvParsed.rows.slice(1);
+    }
+    csvSpaltenAktualisieren(csvParsed.headers);
+    csvVorschauAktualisieren();
+  };
+}
+
+function csvVorschauAktualisieren() {
+  const colName    = +document.getElementById('csv-col-name').value;
+  const colAep     = +document.getElementById('csv-col-aep').value;
+  const colLs      = +document.getElementById('csv-col-ls').value;
+  const colAbsatz  = +document.getElementById('csv-col-absatz').value;
+  const colPzn     = +document.getElementById('csv-col-pzn').value;
+  const colPack    = +document.getElementById('csv-col-packgroesse').value;
+  const colME      = +document.getElementById('csv-col-mengeneinheit').value;
+
+  const preview = csvParsed.rows.slice(0, 6);
+  const count = csvParsed.rows.length;
+  document.getElementById('csv-preview-count').textContent = `(${count} Zeile${count !== 1 ? 'n' : ''} gefunden)`;
+
+  const colsToShow = [
+    { label: 'Artikelname',    col: colName },
+    { label: 'PZN',            col: colPzn },
+    { label: 'Packungsgröße',  col: colPack },
+    { label: 'ME',             col: colME },
+    { label: 'AEP (€)',        col: colAep },
+    { label: 'Lagerbestand',   col: colLs },
+    { label: 'Jahresabsatz',   col: colAbsatz },
+  ].filter(c => c.col >= 0);
+
+  const tbl = document.getElementById('csv-preview-table');
+  tbl.innerHTML = `
+    <thead><tr style="background:var(--bg-secondary)">${colsToShow.map(c =>
+      `<th style="padding:6px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--text-secondary);white-space:nowrap">${c.label}</th>`
+    ).join('')}</tr></thead>
+    <tbody>${preview.map((row, ri) => `
+      <tr style="${ri % 2 === 1 ? 'background:var(--bg-secondary)' : ''}">${colsToShow.map(c =>
+        `<td style="padding:5px 10px;font-size:13px;color:var(--text)">${row[c.col] ?? '—'}</td>`
+      ).join('')}</tr>`
+    ).join('')}</tbody>
+  `;
+}
+
+function csvImportieren() {
+  const colName   = +document.getElementById('csv-col-name').value;
+  const colAep    = +document.getElementById('csv-col-aep').value;
+  const colLs     = +document.getElementById('csv-col-ls').value;
+  const colAbsatz = +document.getElementById('csv-col-absatz').value;
+  const colPzn    = +document.getElementById('csv-col-pzn').value;
+  const colPack   = +document.getElementById('csv-col-packgroesse').value;
+  const colME     = +document.getElementById('csv-col-mengeneinheit').value;
+
+  const parseNum = s => {
+    if (s == null || s === '') return 0;
+    const cleaned = s.trim().replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  };
+
+  let importiert = 0;
+  csvParsed.rows.forEach(row => {
+    const name = colName >= 0 ? (row[colName] || '').trim() : 'Importierter Artikel';
+    if (!name) return;
+    produkte.push({
+      name,
+      aep: colAep >= 0 ? parseNum(row[colAep]) : 0,
+      ls: colLs >= 0 ? Math.round(parseNum(row[colLs])) : 0,
+      absatzJahr: colAbsatz >= 0 ? Math.round(parseNum(row[colAbsatz])) : 0,
+      absatzMonat: null,
+      vpe: null,
+      minbest: null,
+      eigeneKonditionen: false,
+      eigeneStaffeln: [],
+      skonto: null,
+      skontotage: null,
+      eigeneSkonto: false,
+      pzn: colPzn >= 0 ? (row[colPzn] || '').trim() || null : null,
+      packgroesse: colPack >= 0 ? (row[colPack] || '').trim() || null : null,
+      mengeneinheit: (() => {
+        if (colME < 0) return null;
+        const raw = (row[colME] || '').trim();
+        if (!raw) return null;
+        const norm = raw.toUpperCase();
+        if (norm === 'ST' || norm === 'STK' || norm === 'STÜCK') return 'Stk';
+        if (norm === 'ML') return 'ml';
+        if (norm === 'G' || norm === 'GR' || norm === 'GRM') return 'g';
+        if (norm === 'PK' || norm === 'PKG' || norm === 'PACKUNG') return 'Pkg';
+        return 'andere';
+      })(),
+    });
+    importiert++;
+  });
+
+  renderProdukte();
+  markErgebnisVeraltet();
+  csvModalSchliessen();
+
+  // Brief confirmation
+  const btn = document.querySelector('.btn-calc');
+  const orig = btn.textContent;
+  btn.textContent = `✓ ${importiert} Produkte importiert`;
+  setTimeout(() => btn.textContent = orig, 2500);
+}
+
+function csvModalSchliessen() {
+  document.getElementById('csv-modal').style.display = 'none';
+  csvParsed = { headers: [], rows: [] };
+}
+// ── Ende CSV Import ─────────────────────────────────────────
+
+function maskeLeeren() {
+  if (!confirm('Alle Eingaben löschen?')) return;
+  // Aktionsparameter zurücksetzen
+  document.getElementById('g-bestellfrist-check').checked = true;
+  toggleBestellfrist();
+  document.getElementById('g-bestellfrist').value = '';
+  document.getElementById('g-valuta').value = '';
+  document.getElementById('g-monat').value = '';
+  document.getElementById('g-jahr').value = '';
+  document.getElementById('g-mhd-check').checked = true;
+  toggleMHD();
+  document.getElementById('g-ziel-ls-check').checked = true;
+  toggleZielLS();
+  // Staffeln, Skonto, Produkte leeren
+  staffeln = [];
+  skontoListe = [];
+  produkte = [];
+  renderStaffeln();
+  renderSkonto();
+  renderProdukte();
+  // Ergebnis leeren
+  document.getElementById('ergebnis').innerHTML = '';
+  document.getElementById('footnote').innerHTML = '';
+  window._druckDaten = null;
 }
 
 // Init
 renderStaffeln();
+renderSkonto();
 renderProdukte();
 </script>
 </body>

@@ -463,7 +463,8 @@ function getNaechste() {
 }
 
 // Naturalrabatt → Barrabatt-Äquivalent
-// kauf X zahl Y → gratis = X-Y → BR = (X-Y)/X
+// kaufe = Gesamtmenge (bezahlt + gratis), zahle = bezahlte Menge
+// BR = NR / (Kauf + NR) × 100 = (kaufe - zahle) / kaufe × 100
 function naturalZuBar(kaufe, zahle) {
   if (!kaufe || !zahle || zahle >= kaufe) return 0;
   return (kaufe - zahle) / kaufe * 100;
@@ -574,6 +575,8 @@ function getEffektiverRabatt(s) {
 }
 
 function renderStaffeln() {
+  // Fokus-Wiederherstellung: tabIndex des aktuell fokussierten Elements merken
+  const focusedTabIndex = document.activeElement ? document.activeElement.tabIndex : -1;
   const c = document.getElementById('staffel-container');
   c.innerHTML = '';
   staffeln.forEach((s, i) => {
@@ -588,20 +591,22 @@ function renderStaffeln() {
       ? `Barrabatt-Äquivalent: <strong>${effRabatt.toFixed(2)}%</strong>`
       : '';
 
+    // Spalten: Barrabatt = Rabatttyp | ab Stück | Barrabatt(%)
+    //          Natural   = Rabatttyp | Kauf+NR   (ab Stück entfällt, menge = zahle)
     div.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
-        <div class="field">
-          <label>ab Stück</label>
-          <input type="number" value="${s.menge}" min="1" onchange="staffeln[${i}].menge=+this.value;markErgebnisVeraltet()">
-        </div>
+      <div style="display:grid;grid-template-columns:${s.typ==='bar' ? '1fr 1fr 1fr' : '1fr 1fr'} auto;gap:8px;align-items:end">
         <div class="field">
           <label>Rabatttyp</label>
-          <select onchange="staffeln[${i}].typ=this.value;renderStaffeln();markErgebnisVeraltet()">
+          <select onchange="staffeln[${i}].typ=this.value;if(this.value==='natural'){staffeln[${i}].menge=staffeln[${i}].zahle||0;}renderStaffeln();markErgebnisVeraltet()">
             <option value="bar" ${s.typ==='bar'?'selected':''}>Barrabatt (%)</option>
             <option value="natural" ${s.typ==='natural'?'selected':''}>Naturalrabatt</option>
           </select>
         </div>
         ${s.typ === 'bar' ? `
+        <div class="field">
+          <label>ab Stück</label>
+          <input type="number" value="${s.menge||''}" min="1" onchange="staffeln[${i}].menge=+this.value;markErgebnisVeraltet()">
+        </div>
         <div class="field">
           <label>Barrabatt (%)</label>
           <input type="number" value="${s.rabatt||''}" min="0" max="100" step="0.5" placeholder="z.B. 25" onchange="staffeln[${i}].rabatt=+this.value;renderStaffeln();markErgebnisVeraltet()">
@@ -610,9 +615,13 @@ function renderStaffeln() {
         <div class="field">
           <label>Kauf + NR</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <input type="number" value="${s.kaufe||''}" min="1" placeholder="Kauf" style="flex:1" onchange="staffeln[${i}].kaufe=+this.value;renderStaffeln();markErgebnisVeraltet()">
+            <input type="number" value="${s.zahle||''}" min="1" placeholder="Kauf" style="flex:1" tabindex="${i*10+1}"
+              onchange="staffeln[${i}].zahle=+this.value;staffeln[${i}].menge=+this.value;staffeln[${i}].kaufe=(+this.value)+(_getNR('s',${i}));renderStaffeln();markErgebnisVeraltet()"
+              oninput="staffeln[${i}].zahle=+this.value;staffeln[${i}].menge=+this.value;markErgebnisVeraltet()">
             <span style="font-size:13px;color:var(--text-secondary);white-space:nowrap">+</span>
-            <input type="number" value="${s.zahle!=null?(s.kaufe||0)-(s.zahle||0)||'':''}" min="0" placeholder="NR" style="flex:1" onchange="staffeln[${i}].zahle=(+this.value>=0&&staffeln[${i}].kaufe)?(staffeln[${i}].kaufe-+this.value):null;renderStaffeln();markErgebnisVeraltet()">
+            <input type="number" value="${s.kaufe!=null&&s.zahle!=null?(s.kaufe-s.zahle)||'':''}" min="0" placeholder="NR" style="flex:1" tabindex="${i*10+2}"
+              onchange="staffeln[${i}].kaufe=(staffeln[${i}].zahle||0)+(+this.value);renderStaffeln();markErgebnisVeraltet()"
+              oninput="staffeln[${i}].kaufe=(staffeln[${i}].zahle||0)+(+this.value);markErgebnisVeraltet()">
           </div>
         </div>
         `}
@@ -620,10 +629,23 @@ function renderStaffeln() {
           <button class="btn-remove" onclick="removeStaffel(${i})">✕</button>
         </div>
       </div>
-      ${infoText ? `<div class="nr-info" style="margin-top:8px">${infoText} &nbsp;(kaufe ${s.kaufe}, erhalte ${s.kaufe - s.zahle} gratis)</div>` : ''}
+      ${infoText ? `<div class="nr-info" style="margin-top:8px">${infoText} &nbsp;(kaufe ${s.zahle}, erhalte ${s.kaufe - s.zahle} gratis)</div>` : ''}
     `;
     c.appendChild(div);
   });
+  // Fokus wiederherstellen: gleiches tabIndex-Element im neu gerenderten DOM fokussieren
+  if (focusedTabIndex > 0) {
+    requestAnimationFrame(() => {
+      const target = c.querySelector(`[tabindex="${focusedTabIndex}"]`);
+      if (target) target.focus();
+    });
+  }
+}
+
+function _getNR(typ, idx, si) {
+  const s = typ === 's' ? staffeln[idx] : produkte[idx].eigeneStaffeln[si];
+  if (!s || !s.kaufe || !s.zahle) return 0;
+  return s.kaufe - s.zahle;
 }
 
 function addStaffel() {
@@ -653,7 +675,7 @@ function renderEigeneStaffeln(pi) {
   p.eigeneStaffeln.forEach((s, si) => {
     const effR = getEffektiverRabatt(s);
     const infoTxt = s.typ === 'natural' && s.kaufe && s.zahle
-      ? `<div class="nr-info" style="margin-top:6px">BR-Äquivalent: <strong>${effR.toFixed(2)}%</strong> &nbsp;(kaufe ${s.kaufe}, erhalte ${s.kaufe - s.zahle} gratis)</div>`
+      ? `<div class="nr-info" style="margin-top:6px">BR-Äquivalent: <strong>${effR.toFixed(2)}%</strong> &nbsp;(kaufe ${s.zahle}, erhalte ${s.kaufe - s.zahle} gratis)</div>`
       : '';
     const row = document.createElement('div');
     row.style.cssText = 'margin-bottom:8px;padding:8px 10px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius)';
@@ -674,9 +696,13 @@ function renderEigeneStaffeln(pi) {
         </div>` : `
         <div class="field"><label>Kauf + NR</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <input type="number" value="${s.kaufe||''}" min="1" placeholder="Kauf" style="flex:1" onchange="produkte[${pi}].eigeneStaffeln[${si}].kaufe=+this.value;renderEigeneStaffeln(${pi})">
+            <input type="number" value="${s.zahle||''}" min="1" placeholder="Kauf" style="flex:1"
+              onchange="produkte[${pi}].eigeneStaffeln[${si}].zahle=+this.value;produkte[${pi}].eigeneStaffeln[${si}].kaufe=(+this.value)+_getNR('p',${pi},${si});renderEigeneStaffeln(${pi})"
+              oninput="produkte[${pi}].eigeneStaffeln[${si}].zahle=+this.value;markErgebnisVeraltet()">
             <span style="font-size:13px;color:var(--text-secondary)">+</span>
-            <input type="number" value="${s.kaufe!=null&&s.zahle!=null?(s.kaufe-s.zahle)||'':''}" min="0" placeholder="NR" style="flex:1" onchange="produkte[${pi}].eigeneStaffeln[${si}].zahle=(+this.value>=0&&produkte[${pi}].eigeneStaffeln[${si}].kaufe)?(produkte[${pi}].eigeneStaffeln[${si}].kaufe-+this.value):null;renderEigeneStaffeln(${pi})">
+            <input type="number" value="${s.kaufe!=null&&s.zahle!=null?(s.kaufe-s.zahle)||'':''}" min="0" placeholder="NR" style="flex:1"
+              onchange="produkte[${pi}].eigeneStaffeln[${si}].kaufe=(produkte[${pi}].eigeneStaffeln[${si}].zahle||0)+(+this.value);renderEigeneStaffeln(${pi})"
+              oninput="produkte[${pi}].eigeneStaffeln[${si}].kaufe=(produkte[${pi}].eigeneStaffeln[${si}].zahle||0)+(+this.value);markErgebnisVeraltet()">
           </div>
         </div>`}
         <div style="padding-bottom:2px">
@@ -764,9 +790,15 @@ function renderProdukte() {
         </div>
       </div>
       <div style="margin-top:10px;padding-top:8px;border-top:0.5px solid var(--border)">
-        <div class="checkbox-row">
-          <input type="checkbox" id="skonto-check-${i}" ${!p.eigeneSkonto ? 'checked' : ''} onchange="toggleEigeneSkonto(${i})">
-          <label for="skonto-check-${i}" style="font-size:13px;color:var(--text-secondary)">Skonto wie oben</label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="checkbox-row">
+            <input type="checkbox" id="sortenrein-${i}" ${p.sortenrein ? 'checked' : ''} onchange="produkte[${i}].sortenrein=this.checked;markErgebnisVeraltet()">
+            <label for="sortenrein-${i}" style="font-size:13px;color:var(--text-secondary)">Sortenrein (Staffel pro Produkt einzeln)</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="skonto-check-${i}" ${!p.eigeneSkonto ? 'checked' : ''} onchange="toggleEigeneSkonto(${i})">
+            <label for="skonto-check-${i}" style="font-size:13px;color:var(--text-secondary)">Skonto wie oben</label>
+          </div>
         </div>
         ${p.eigeneSkonto ? `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
@@ -817,7 +849,7 @@ function renderProdukte() {
 }
 
 function addProdukt() {
-  produkte.push({ name: 'Neues Produkt', aep: 0, ls: 0, absatzJahr: 0, absatzMonat: null, vpe: null, minbest: null, eigeneKonditionen: false, eigeneStaffeln: [], skonto: null, skontotage: null, eigeneSkonto: false, pzn: null, packgroesse: null, mengeneinheit: null });
+  produkte.push({ name: 'Neues Produkt', aep: 0, ls: 0, absatzJahr: 0, absatzMonat: null, vpe: null, minbest: null, eigeneKonditionen: false, eigeneStaffeln: [], skonto: null, skontotage: null, eigeneSkonto: false, pzn: null, packgroesse: null, mengeneinheit: null, sortenrein: false });
   renderProdukte();
   markErgebnisVeraltet();
 }
@@ -891,21 +923,66 @@ function berechnen() {
     .map(s => ({ ...s, effRabatt: getEffektiverRabatt(s) }))
     .sort((a, b) => a.menge - b.menge);
 
-  // Produkte berechnen — nur Produkte mit gemeinsamen Konditionen fließen in Gesamtstaffel
+  // NR-Staffeln der globalen Staffelliste (für VPE-Ableitung)
+  const nrStaffelnGlobal = sortedStaffeln.filter(s => s.typ === 'natural' && s.zahle > 0 && s.kaufe > s.zahle);
+
+  // VPE für ein Produkt anhand NR-Staffeln bestimmen.
+  // Nur wenn ALLE relevanten Staffeln NR sind — bei Mischung mit Barrabatt kein VPE-Auto.
+  // OPTIMIERUNG: Wenn VPE-Rundung die nächste Staffelstufe erreichbar macht,
+  // wechsle auf die höhere Einheit — ist kaufmännisch besser.
+  function getNRVpeMinbest(rohbedarf, staffelListe) {
+    if (!staffelListe || staffelListe.length === 0) return { vpe: null, minbest: null };
+    const hatBar = staffelListe.some(s => s.typ === 'bar');
+    if (hatBar) return { vpe: null, minbest: null };
+    const nr = staffelListe.filter(s => s.typ === 'natural' && s.zahle > 0 && s.kaufe > s.zahle);
+    if (nr.length === 0) return { vpe: null, minbest: null };
+    const minbest = nr[0].zahle;
+    let vpe = nr[0].kaufe;
+    for (const s of nr) {
+      if (rohbedarf >= s.zahle) vpe = s.kaufe;
+    }
+    // Post-rounding optimisation: nach Rundung prüfen ob nächste Staffelstufe erreichbar
+    let gerundet = Math.ceil(Math.max(rohbedarf, minbest) / vpe) * vpe;
+    for (const s of nr) {
+      if (gerundet >= s.zahle && s.kaufe > vpe) {
+        vpe = s.kaufe;
+        gerundet = Math.ceil(Math.max(rohbedarf, minbest) / vpe) * vpe;
+      }
+    }
+    return { vpe, minbest };
+  }
+
+  // Produkte berechnen
   const produktErgebnisse = produkte.map(p => {
     const ma = getMA(p);
     const zielLSstueck = Math.round(ma * zielLS);
     const rohmenge = Math.max(0, Math.round(ma * zeitfenster) + zielLSstueck - p.ls);
-    const nettoBedarf = rundeVPE(rohmenge, p.vpe, p.minbest);
+
     // Eigene Staffeln sortieren falls vorhanden
     const eigeneSorted = p.eigeneKonditionen
       ? [...p.eigeneStaffeln].map(s => ({ ...s, effRabatt: getEffektiverRabatt(s) })).sort((a, b) => a.menge - b.menge)
       : null;
-    return { p, ma, zielLSstueck, rohmenge, nettoBedarf, gerundet: nettoBedarf > rohmenge, eigeneSorted };
+
+    // VPE und Minbest: manuell eingetragen hat Vorrang;
+    // sonst bei NR-Staffeln automatisch ableiten
+    let vpeEff = p.vpe || null;
+    let minbestEff = p.minbest || null;
+    const relevantNRStaffeln = p.eigeneKonditionen ? eigeneSorted : sortedStaffeln;
+    const { vpe: nrVpe, minbest: nrMinbest } = getNRVpeMinbest(rohmenge, relevantNRStaffeln);
+    if (!vpeEff && nrVpe) vpeEff = nrVpe;
+    if (!minbestEff && nrMinbest) minbestEff = nrMinbest;
+
+    const nettoBedarf = rundeVPE(rohmenge, vpeEff, minbestEff);
+    const nrVpeAktiv = !p.vpe && nrVpe; // zeige Hinweis wenn NR-VPE automatisch angewendet
+
+    return { p, ma, zielLSstueck, rohmenge, nettoBedarf, gerundet: nettoBedarf > rohmenge,
+             eigeneSorted, vpeEff, minbestEff, nrVpeAktiv, nrVpe };
   });
 
-  // Gesamtstückzahl nur aus Produkten mit gemeinsamer Staffel
-  const gemeinsamErgebnisse = produktErgebnisse.filter(r => !r.p.eigeneKonditionen);
+  // Sortenrein: Produkte mit p.sortenrein=true werden einzeln gegen Staffel geprüft
+  // Gemeinsam: nur Produkte ohne sortenrein und ohne eigeneKonditionen
+  const gemeinsamErgebnisse = produktErgebnisse.filter(r => !r.p.eigeneKonditionen && !r.p.sortenrein);
+  const sortenreinErgebnisse = produktErgebnisse.filter(r => !r.p.eigeneKonditionen && r.p.sortenrein);
   const eigeneErgebnisse = produktErgebnisse.filter(r => r.p.eigeneKonditionen);
   const gesamtNetto = gemeinsamErgebnisse.reduce((s, r) => s + r.nettoBedarf, 0);
 
@@ -913,6 +990,15 @@ function berechnen() {
   for (let i = 0; i < sortedStaffeln.length; i++) {
     if (gesamtNetto >= sortedStaffeln[i].menge) erreichbareStaffel = sortedStaffeln[i];
     else if (!naechsteStaffel) naechsteStaffel = sortedStaffeln[i];
+  }
+
+  // Sortenrein: für jedes Produkt beste erreichbare Staffel einzeln
+  function getSortenreinRabatt(r) {
+    let best = null;
+    for (const s of sortedStaffeln) {
+      if (r.nettoBedarf >= s.menge) best = s;
+    }
+    return best;
   }
 
   // Skonto: effektiver Netto-AEP pro Produkt = AEP × (1 - Rabatt%) × (1 - Skonto%)
@@ -979,166 +1065,207 @@ function berechnen() {
     Eff. Kapitalbindung: <strong>${effKapitalDauer.toFixed(1)} Monate</strong>${valutaEntlastet ? ` <em style="font-size:11px">(ø ${avgLager.toFixed(1)} Mon. − ${valutaVerzögerungMonate.toFixed(1)} Mon. Valuta)</em>` : ''}
   </div>`;
 
-  // VPE-Rundungshinweis
+  // VPE-Rundungshinweis (manuell + NR-automatisch)
   const gerundete = produktErgebnisse.filter(r => r.gerundet);
   if (gerundete.length > 0) {
-    const txt = gerundete.map(r => `${r.p.name} (${r.rohmenge} → ${r.nettoBedarf} Stk.)`).join(', ');
+    const txt = gerundete.map(r => {
+      const hinweis = r.nrVpeAktiv ? ` [NR-VPE ${r.nrVpe} auto]` : '';
+      return `${r.p.name}${hinweis} (${r.rohmenge} → ${r.nettoBedarf} Stk.)`;
+    }).join(', ');
     html += `<div class="alert alert-warn">VPE-Rundung angewendet: ${txt}</div>`;
   }
+  // NR-VPE Hinweis auch wenn nicht gerundet
+  const nrVpeHinweise = produktErgebnisse.filter(r => r.nrVpeAktiv && !r.gerundet);
+  if (nrVpeHinweise.length > 0) {
+    const txt = nrVpeHinweise.map(r => `${r.p.name} (VPE ${r.nrVpe} aus NR-Staffel)`).join(', ');
+    html += `<div class="alert alert-info" style="font-size:12px">NR-VPE automatisch: ${txt}</div>`;
+  }
 
-  if (!erreichbareStaffel) {
+  if (gemeinsamErgebnisse.length === 0 && sortenreinErgebnisse.length > 0) {
+    // Alle Produkte sind sortenrein — es gibt keine gemeinsame Staffelprüfung
+    html += `<div class="alert alert-info">Alle Produkte sind als sortenrein markiert — Staffelprüfung erfolgt pro Produkt einzeln. Ergebnisse siehe unten.</div>`;
+  } else if (!erreichbareStaffel) {
     html += `<div class="alert alert-danger">Auf Basis des berechneten Bedarfs wird keine Staffelgrenze erreicht. Prüfe die Eingaben.</div>`;
-    html += `</div>`;
-    document.getElementById('ergebnis').innerHTML = html;
-    return;
+    // Zeige trotzdem sortenreine Produkte wenn vorhanden
+    if (sortenreinErgebnisse.length === 0 && eigeneErgebnisse.length === 0) {
+      html += `</div>`;
+      document.getElementById('ergebnis').innerHTML = html;
+      return;
+    }
   }
 
-  // --- Basisbestellung ---
-  const rabatt = erreichbareStaffel.effRabatt;
-  const brutto = calcVorteil(baseList, rabatt);
-  const kapKosten = calcKapital(baseList, rabatt);
-  const netto = brutto - kapKosten;
+  // --- Basisbestellung (nur wenn gemeinsame Staffel erreicht) ---
+  if (erreichbareStaffel) {
+    const rabatt = erreichbareStaffel.effRabatt;
+    const brutto = calcVorteil(baseList, rabatt);
+    const kapKosten = calcKapital(baseList, rabatt);
+    const netto = brutto - kapKosten;
 
-  const staffelLabel = erreichbareStaffel.typ === 'natural'
-    ? `ab ${erreichbareStaffel.menge} Stk. — ${erreichbareStaffel.kaufe}+${erreichbareStaffel.kaufe - erreichbareStaffel.zahle} Naturalrabatt (≈ ${fmtPct(rabatt)} BR)`
-    : `ab ${erreichbareStaffel.menge} Stk. — ${fmtPct(rabatt)} Barrabatt`;
+    const staffelLabel = erreichbareStaffel.typ === 'natural'
+      ? `ab ${erreichbareStaffel.zahle} Stk. — ${erreichbareStaffel.zahle}+${erreichbareStaffel.kaufe - erreichbareStaffel.zahle} Naturalrabatt (≈ ${fmtPct(rabatt)} BR)`
+      : `ab ${erreichbareStaffel.menge} Stk. — ${fmtPct(rabatt)} Barrabatt`;
 
-  html += `<div class="result-card best">`;
-  html += `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-    <span style="font-size:15px;font-weight:500">Empfohlene Staffel: ${staffelLabel}</span>
-    <span class="tag tag-best">Empfehlung</span>
-  </div>`;
-  html += `<div class="metric-grid">
-    <div class="metric"><div class="metric-label">Gesamtbestellung</div><div class="metric-value">${gesamtNetto} Stk.</div></div>
-    <div class="metric"><div class="metric-label">Bruttovorteil</div><div class="metric-value">${fmt(brutto)}</div></div>
-    <div class="metric"><div class="metric-label">Kapitalbindungskosten</div><div class="metric-value">${fmt(kapKosten)}</div></div>
-    <div class="metric"><div class="metric-label">Nettovorteil</div><div class="metric-value success-text">${fmt(netto)}</div></div>
-  </div>`;
-
-  html += `<div class="tbl-header" style="grid-template-columns:${cols4}">
-    <span>Produkt</span><span class="r">Bestellmenge</span><span class="r">Netto-AEP</span><span class="r">Gesamtvorteil</span>
-  </div>`;
-  gemeinsamErgebnisse.forEach(({ p, nettoBedarf, gerundet }) => {
-    const sk = getSkonto(p);
-    const aktionsAep = p.aep * (1 - rabatt / 100) * (1 - sk / 100);
-    const vorteil = nettoBedarf * (p.aep - aktionsAep);
-    const skontoInfo = sk > 0 ? ` <span class="muted" style="font-size:11px">(inkl. ${sk}% Sk.)</span>` : '';
-    const vpeInfo = p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${p.vpe}${gerundet ? ' ↑' : ''})</span>` : '';
-    html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
-      <span>${p.name}${vpeInfo}</span>
-      <span class="r">${nettoBedarf} Stk.</span>
-      <span class="r">${aktionsAep.toFixed(2).replace('.', ',')} €${skontoInfo}</span>
-      <span class="r">${fmt(vorteil)}</span>
-    </div>`;
-  });
-  html += `</div>`;
-
-  // Produkte mit eigenen Konditionen separat ausgeben
-  if (eigeneErgebnisse.length > 0) {
-    html += `<div class="result-card" style="margin-top:10px">`;
-    html += `<div style="font-size:14px;font-weight:500;margin-bottom:10px">Produkte mit eigenen Konditionen</div>`;
-    html += `<div class="tbl-header" style="grid-template-columns:${cols4}"><span>Produkt</span><span class="r">Bestellmenge</span><span class="r">Netto-AEP</span><span class="r">Gesamtvorteil</span></div>`;
-    eigeneErgebnisse.forEach(r => {
-      const eigRabatt = getEigenerRabatt(r);
-      const sk = getSkonto(r.p);
-      const aktionsAep = r.p.aep * (1 - eigRabatt / 100) * (1 - sk / 100);
-      const vorteil = r.nettoBedarf * (r.p.aep - aktionsAep);
-      const vpeInfo = r.p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${r.p.vpe}${r.gerundet ? ' ↑' : ''})</span>` : '';
-      const rabattInfo = eigRabatt > 0 ? ` <span class="muted" style="font-size:11px">(${fmtPct(eigRabatt)}${sk > 0 ? ` + ${sk}% Sk.` : ''})</span>` : ` <span class="muted" style="font-size:11px">(keine Staffel erreicht)</span>`;
-      html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
-        <span>${r.p.name}${vpeInfo}${rabattInfo}</span>
-        <span class="r">${r.nettoBedarf} Stk.</span>
-        <span class="r">${eigRabatt > 0 ? aktionsAep.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
-        <span class="r">${eigRabatt > 0 ? fmt(vorteil) : '—'}</span>
-      </div>`;
-    });
-    html += `</div>`;
-
-  }
-
-  // --- Aufstockungsblock (nur gemeinsame Staffel) ---
-  if (naechsteStaffel) {
-    const rab2 = naechsteStaffel.effRabatt;
-    const fehlend = naechsteStaffel.menge - gesamtNetto;
-    const rohVerteilung = verteileAufstockung(gemeinsamErgebnisse, fehlend);
-    const aufVerteilung = gemeinsamErgebnisse.map(({ p, nettoBedarf }, i) => {
-      const zielGesamt = nettoBedarf + rohVerteilung[i];
-      return rundeVPE(zielGesamt, p.vpe, null) - nettoBedarf;
-    });
-    const aufList = gemeinsamErgebnisse.map(({ p, nettoBedarf }, i) => ({ p, menge: nettoBedarf + aufVerteilung[i] }));
-    const gesamtMitAuf = aufList.reduce((s, { menge }) => s + menge, 0);
-    const bruttoAuf = calcVorteil(aufList, rab2);
-    const kapAuf = calcKapital(aufList, rab2);
-    const nettoAuf = bruttoAuf - kapAuf;
-    const nettoDiff = nettoAuf - netto;
-    const fehlendNachVPE = naechsteStaffel.menge - gesamtMitAuf;
-
-    const auf2Label = naechsteStaffel.typ === 'natural'
-      ? `auf ${naechsteStaffel.menge} Stk. — ${naechsteStaffel.kaufe}+${naechsteStaffel.kaufe - naechsteStaffel.zahle} Naturalrabatt (≈ ${fmtPct(rab2)} BR)`
-      : `auf ${naechsteStaffel.menge} Stk. — ${fmtPct(rab2)} Barrabatt`;
-
-    html += `<div class="result-card" style="margin-top:10px">`;
+    html += `<div class="result-card best">`;
     html += `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      <span style="font-size:15px;font-weight:500">Aufstockung ${auf2Label}</span>
-      <span class="tag tag-warn">+${fehlend} Stk. nötig</span>
+      <span style="font-size:15px;font-weight:500">Empfohlene Staffel: ${staffelLabel}</span>
+      <span class="tag tag-best">Empfehlung</span>
     </div>`;
     html += `<div class="metric-grid">
-      <div class="metric"><div class="metric-label">Gesamtbestellung</div><div class="metric-value">${gesamtMitAuf} Stk.</div></div>
-      <div class="metric"><div class="metric-label">Bruttovorteil</div><div class="metric-value">${fmt(bruttoAuf)}</div></div>
-      <div class="metric"><div class="metric-label">Kapitalbindungskosten</div><div class="metric-value">${fmt(kapAuf)}</div></div>
-      <div class="metric"><div class="metric-label">Nettovorteil</div><div class="metric-value">${fmt(nettoAuf)}</div></div>
+      <div class="metric"><div class="metric-label">Gesamtbestellung</div><div class="metric-value">${gesamtNetto} Stk.</div></div>
+      <div class="metric"><div class="metric-label">Bruttovorteil</div><div class="metric-value">${fmt(brutto)}</div></div>
+      <div class="metric"><div class="metric-label">Kapitalbindungskosten</div><div class="metric-value">${fmt(kapKosten)}</div></div>
+      <div class="metric"><div class="metric-label">Nettovorteil</div><div class="metric-value success-text">${fmt(netto)}</div></div>
     </div>`;
 
-    html += `<div class="tbl-header" style="grid-template-columns:${cols6}">
-      <span>Produkt</span><span class="r">Basis</span><span class="r">Aufstockung</span><span class="r">Gesamt</span><span class="r">VPE</span><span class="r">Gesamtvorteil</span>
+    html += `<div class="tbl-header" style="grid-template-columns:${cols4}">
+      <span>Produkt</span><span class="r">Bestellmenge</span><span class="r">Netto-AEP</span><span class="r">Gesamtvorteil</span>
     </div>`;
-    gemeinsamErgebnisse.forEach(({ p, nettoBedarf }, i) => {
-      const auf = aufVerteilung[i];
-      const ges = nettoBedarf + auf;
+    // Helper: Staffel-Info für Bestellmenge
+    function staffelInfo(menge, s) {
+      if (!s) return '';
+      if (s.typ === 'natural') return ` <span class="muted" style="font-size:11px">(${s.zahle}+${s.kaufe-s.zahle})</span>`;
+      return ` <span class="muted" style="font-size:11px">(${fmtPct(s.effRabatt)})</span>`;
+    }
+    gemeinsamErgebnisse.forEach(({ p, nettoBedarf, gerundet }) => {
       const sk = getSkonto(p);
-      const aktionsAep = p.aep * (1 - rab2 / 100) * (1 - sk / 100);
-      const vorteil = ges * (p.aep - aktionsAep);
-      const aufStr = auf > 0
-        ? `<span class="r warn-text">+${auf}</span>`
-        : `<span class="r muted">—</span>`;
-      html += `<div class="tbl-row" style="grid-template-columns:${cols6}">
-        <span>${p.name}</span>
-        <span class="r">${nettoBedarf} Stk.</span>
-        ${aufStr}
-        <span class="r" style="font-weight:500">${ges} Stk.</span>
-        <span class="r muted">${p.vpe || '—'}</span>
+      const aktionsAep = p.aep * (1 - rabatt / 100) * (1 - sk / 100);
+      const vorteil = nettoBedarf * (p.aep - aktionsAep);
+      const skontoInfo = sk > 0 ? ` <span class="muted" style="font-size:11px">(inkl. ${sk}% Sk.)</span>` : '';
+      const vpeInfo = p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${p.vpe}${gerundet ? ' ↑' : ''})</span>` : '';
+      html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
+        <span>${p.name}${vpeInfo}</span>
+        <span class="r">${nettoBedarf} Stk.${staffelInfo(nettoBedarf, erreichbareStaffel)}</span>
+        <span class="r">${aktionsAep.toFixed(2).replace('.', ',')} €${skontoInfo}</span>
         <span class="r">${fmt(vorteil)}</span>
       </div>`;
     });
+    html += `</div>`;
 
-    const gesamtAufstockung = gesamtMitAuf - gesamtNetto;
-    html += `<div class="tbl-row total" style="grid-template-columns:${cols6}">
-      <span>Gesamt</span>
-      <span class="r">${gesamtNetto} Stk.</span>
-      <span class="r warn-text">+${gesamtAufstockung}</span>
-      <span class="r">${gesamtMitAuf} Stk.</span>
-      <span class="r">—</span>
-      <span class="r">${fmt(bruttoAuf)}</span>
-    </div>`;
-
-    if (fehlendNachVPE > 0) {
-      html += `<div class="alert alert-warn" style="margin-top:12px;margin-bottom:0">
-        Nach VPE-Rundung: ${gesamtMitAuf} Stk. — Staffelgrenze noch nicht erreicht.
-        Noch <strong>${fehlendNachVPE} Stk.</strong> auf ein beliebiges Produkt aufstocken.
-      </div>`;
-    } else {
-      const cls = nettoDiff > 0 ? 'alert-success' : 'alert-warn';
-      const txt = nettoDiff > 0
-        ? 'Aufstockung ist wirtschaftlich sinnvoll. Prüfe, ob der erhöhte Lagerbestand die Folgeaktion nicht einschränkt.'
-        : 'Aufstockung rechnet sich nicht — Mehrkosten überwiegen den Rabattvorteil.';
-      html += `<div class="alert ${cls}" style="margin-top:12px;margin-bottom:0">
-        Mehrertrag gegenüber Basisbestellung: <strong>${nettoDiff >= 0 ? '+' : ''}${fmt(nettoDiff)}</strong> — ${txt}
-      </div>`;
+    // Produkte mit eigenen Konditionen
+    if (eigeneErgebnisse.length > 0) {
+      html += `<div class="result-card" style="margin-top:10px">`;
+      html += `<div style="font-size:14px;font-weight:500;margin-bottom:10px">Produkte mit eigenen Konditionen</div>`;
+      html += `<div class="tbl-header" style="grid-template-columns:${cols4}"><span>Produkt</span><span class="r">Bestellmenge</span><span class="r">Netto-AEP</span><span class="r">Gesamtvorteil</span></div>`;
+      eigeneErgebnisse.forEach(r => {
+        const eigRabatt = getEigenerRabatt(r);
+        const eigStaffel = r.eigeneSorted ? r.eigeneSorted.filter(s => r.nettoBedarf >= s.menge).pop() : null;
+        const sk = getSkonto(r.p);
+        const aktionsAep = r.p.aep * (1 - eigRabatt / 100) * (1 - sk / 100);
+        const vorteil = r.nettoBedarf * (r.p.aep - aktionsAep);
+        const vpeInfo = r.p.vpe ? ` <span class="muted" style="font-size:11px">(VPE ${r.p.vpe}${r.gerundet ? ' ↑' : ''})</span>` : '';
+        const rabattInfo = eigRabatt > 0 ? ` <span class="muted" style="font-size:11px">(${fmtPct(eigRabatt)}${sk > 0 ? ` + ${sk}% Sk.` : ''})</span>` : ` <span class="muted" style="font-size:11px">(keine Staffel erreicht)</span>`;
+        html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
+          <span>${r.p.name}${vpeInfo}${rabattInfo}</span>
+          <span class="r">${r.nettoBedarf} Stk.${staffelInfo(r.nettoBedarf, eigStaffel)}</span>
+          <span class="r">${eigRabatt > 0 ? aktionsAep.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+          <span class="r">${eigRabatt > 0 ? fmt(vorteil) : '—'}</span>
+        </div>`;
+      });
+      html += `</div>`;
     }
+
+    // Aufstockungsblock
+    if (naechsteStaffel) {
+      const rab2 = naechsteStaffel.effRabatt;
+      const fehlend = naechsteStaffel.menge - gesamtNetto;
+      const rohVerteilung = verteileAufstockung(gemeinsamErgebnisse, fehlend);
+      const aufVerteilung = gemeinsamErgebnisse.map(({ p, nettoBedarf, vpeEff }, i) => {
+        const zielGesamt = nettoBedarf + rohVerteilung[i];
+        return rundeVPE(zielGesamt, vpeEff, null) - nettoBedarf;
+      });
+      const aufList = gemeinsamErgebnisse.map(({ p, nettoBedarf }, i) => ({ p, menge: nettoBedarf + aufVerteilung[i] }));
+      const gesamtMitAuf = aufList.reduce((s, { menge }) => s + menge, 0);
+      const bruttoAuf = calcVorteil(aufList, rab2);
+      const kapAuf = calcKapital(aufList, rab2);
+      const nettoAuf = bruttoAuf - kapAuf;
+      const nettoDiff = nettoAuf - netto;
+      const fehlendNachVPE = naechsteStaffel.menge - gesamtMitAuf;
+
+      const auf2Label = naechsteStaffel.typ === 'natural'
+        ? `auf ${naechsteStaffel.zahle} Stk. — ${naechsteStaffel.zahle}+${naechsteStaffel.kaufe - naechsteStaffel.zahle} Naturalrabatt (≈ ${fmtPct(rab2)} BR)`
+        : `auf ${naechsteStaffel.menge} Stk. — ${fmtPct(rab2)} Barrabatt`;
+
+      html += `<div class="result-card" style="margin-top:10px">`;
+      html += `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+        <span style="font-size:15px;font-weight:500">Aufstockung ${auf2Label}</span>
+        <span class="tag tag-warn">+${fehlend} Stk. nötig</span>
+      </div>`;
+      html += `<div class="metric-grid">
+        <div class="metric"><div class="metric-label">Gesamtbestellung</div><div class="metric-value">${gesamtMitAuf} Stk.</div></div>
+        <div class="metric"><div class="metric-label">Bruttovorteil</div><div class="metric-value">${fmt(bruttoAuf)}</div></div>
+        <div class="metric"><div class="metric-label">Kapitalbindungskosten</div><div class="metric-value">${fmt(kapAuf)}</div></div>
+        <div class="metric"><div class="metric-label">Nettovorteil</div><div class="metric-value">${fmt(nettoAuf)}</div></div>
+      </div>`;
+      html += `<div class="tbl-header" style="grid-template-columns:${cols6}">
+        <span>Produkt</span><span class="r">Basis</span><span class="r">Aufstockung</span><span class="r">Gesamt</span><span class="r">VPE</span><span class="r">Gesamtvorteil</span>
+      </div>`;
+      gemeinsamErgebnisse.forEach(({ p, nettoBedarf }, i) => {
+        const auf = aufVerteilung[i];
+        const ges = nettoBedarf + auf;
+        const sk = getSkonto(p);
+        const aktionsAep = p.aep * (1 - rab2 / 100) * (1 - sk / 100);
+        const vorteil = ges * (p.aep - aktionsAep);
+        const aufStr = auf > 0 ? `<span class="r warn-text">+${auf}</span>` : `<span class="r muted">—</span>`;
+        html += `<div class="tbl-row" style="grid-template-columns:${cols6}">
+          <span>${p.name}</span>
+          <span class="r">${nettoBedarf} Stk.</span>
+          ${aufStr}
+          <span class="r" style="font-weight:500">${ges} Stk.</span>
+          <span class="r muted">${p.vpe || '—'}</span>
+          <span class="r">${fmt(vorteil)}</span>
+        </div>`;
+      });
+      const gesamtAufstockung = gesamtMitAuf - gesamtNetto;
+      html += `<div class="tbl-row total" style="grid-template-columns:${cols6}">
+        <span>Gesamt</span>
+        <span class="r">${gesamtNetto} Stk.</span>
+        <span class="r warn-text">+${gesamtAufstockung}</span>
+        <span class="r">${gesamtMitAuf} Stk.</span>
+        <span class="r">—</span>
+        <span class="r">${fmt(bruttoAuf)}</span>
+      </div>`;
+      if (fehlendNachVPE > 0) {
+        html += `<div class="alert alert-warn" style="margin-top:12px;margin-bottom:0">
+          Nach VPE-Rundung: ${gesamtMitAuf} Stk. — Staffelgrenze noch nicht erreicht.
+          Noch <strong>${fehlendNachVPE} Stk.</strong> auf ein beliebiges Produkt aufstocken.
+        </div>`;
+      } else {
+        const cls = nettoDiff > 0 ? 'alert-success' : 'alert-warn';
+        const txt = nettoDiff > 0
+          ? 'Aufstockung ist wirtschaftlich sinnvoll. Prüfe, ob der erhöhte Lagerbestand die Folgeaktion nicht einschränkt.'
+          : 'Aufstockung rechnet sich nicht — Mehrkosten überwiegen den Rabattvorteil.';
+        html += `<div class="alert ${cls}" style="margin-top:12px;margin-bottom:0">
+          Mehrertrag gegenüber Basisbestellung: <strong>${nettoDiff >= 0 ? '+' : ''}${fmt(nettoDiff)}</strong> — ${txt}
+        </div>`;
+      }
+      html += `</div>`;
+    }
+  } // end if (erreichbareStaffel)
+
+  // Sortenrein-Produkte
+  if (sortenreinErgebnisse.length > 0) {
+    html += `<div class="result-card" style="margin-top:10px">`;
+    html += `<div style="font-size:14px;font-weight:500;margin-bottom:10px">Sortenreine Produkte (Staffel je Produkt einzeln)</div>`;
+    html += `<div class="tbl-header" style="grid-template-columns:${cols4}"><span>Produkt</span><span class="r">Bestellmenge</span><span class="r">Netto-AEP</span><span class="r">Gesamtvorteil</span></div>`;
+    sortenreinErgebnisse.forEach(r => {
+      const srStaffel = getSortenreinRabatt(r);
+      const srRabatt = srStaffel ? srStaffel.effRabatt : 0;
+      const sk = getSkonto(r.p);
+      const aktionsAep = r.p.aep * (1 - srRabatt / 100) * (1 - sk / 100);
+      const vorteil = r.nettoBedarf * (r.p.aep - aktionsAep);
+      const vpeInfo = r.vpeEff ? ` <span class="muted" style="font-size:11px">(VPE ${r.vpeEff}${r.gerundet ? ' ↑' : ''}${r.nrVpeAktiv ? ' NR-auto' : ''})</span>` : '';
+      const rabattInfo = srRabatt > 0 ? ` <span class="muted" style="font-size:11px">(${fmtPct(srRabatt)}${sk > 0 ? ` + ${sk}% Sk.` : ''})</span>` : ` <span class="muted" style="font-size:11px">(keine Staffel erreicht)</span>`;
+      html += `<div class="tbl-row" style="grid-template-columns:${cols4}">
+        <span>${r.p.name}${vpeInfo}${rabattInfo}</span>
+        <span class="r">${r.nettoBedarf} Stk.${srStaffel ? staffelInfo(r.nettoBedarf, srStaffel) : ''}</span>
+        <span class="r">${srRabatt > 0 ? aktionsAep.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+        <span class="r">${srRabatt > 0 ? fmt(vorteil) : '—'}</span>
+      </div>`;
+    });
     html += `</div>`;
   }
 
-  html += `</div>`;
+  html += `</div>`; // close result-section
   html += `<div style="margin-top:1rem;display:flex;justify-content:flex-end">
     <button onclick="drucken()" style="font-size:13px;font-family:var(--font);padding:7px 18px;border-radius:var(--radius);border:0.5px solid var(--border-md);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:6px">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M4 4V1h8v3M4 11H2a1 1 0 01-1-1V6a1 1 0 011-1h12a1 1 0 011 1v4a1 1 0 01-1 1h-2M4 8h8M4 11v4h8v-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1152,7 +1279,6 @@ function berechnen() {
      Kapitalbindung: Kostensatz ${((KAPITAL_PA + LAGER_PA) * 100).toFixed(0)}% p.a., eff. Dauer = max(0, ø Lagerdauer − Valuta-Verzögerung) = max(0, ${avgLager.toFixed(1)} − ${valutaVerzögerungMonate.toFixed(1)}) = ${effKapitalDauer.toFixed(1)} Monate &nbsp;|&nbsp;
      MHD-Puffer ${MHD_PUFFER} Monate.`;
 
-  // Druckdaten für drucken() speichern
   window._druckDaten = {
     staffeln: sortedStaffeln,
     skontoListe: skontoListe,
@@ -1170,7 +1296,7 @@ function drucken() {
   const staffelRows = d.staffeln.map(s => {
     const r = s.effRabatt.toFixed(2).replace('.', ',');
     const typ = s.typ === 'natural'
-      ? `Naturalrabatt ${s.kaufe}+${s.kaufe-s.zahle} (≈${r}% BR)`
+      ? `Naturalrabatt ${s.zahle}+${s.kaufe-s.zahle} (≈${r}% BR)`
       : `${r}% Barrabatt`;
     return `<tr><td>ab ${s.menge} Stk.</td><td>${typ}</td></tr>`;
   }).join('');
@@ -1426,6 +1552,7 @@ function csvImportieren() {
       eigeneSkonto: false,
       pzn: colPzn >= 0 ? (row[colPzn] || '').trim() || null : null,
       packgroesse: colPack >= 0 ? (row[colPack] || '').trim() || null : null,
+      sortenrein: false,
       mengeneinheit: (() => {
         if (colME < 0) return null;
         const raw = (row[colME] || '').trim();
